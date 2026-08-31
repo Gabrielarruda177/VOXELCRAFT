@@ -17,6 +17,7 @@ import {
   handleSlotClick,
   updateCursorVisual,
 } from './cursorManager.js';
+import { bindSlotTooltip } from './tooltip.js';
 
 // World Chests State: key 'x,y,z' -> array of 27 slot objects { type, count }
 const worldChests = new Map();
@@ -162,6 +163,7 @@ function renderChestSlots() {
 
     slot.addEventListener('mousedown', (e) => handleSlotClick(slotRef, e, renderChestSlots));
     slot.addEventListener('contextmenu', (e) => e.preventDefault());
+    bindSlotTooltip(slot, slotRef.get);
 
     chestGrid.appendChild(slot);
   });
@@ -226,6 +228,7 @@ function renderChestSlots() {
 
     slot.addEventListener('mousedown', (e) => handleSlotClick(slotRef, e, renderChestSlots));
     slot.addEventListener('contextmenu', (e) => e.preventDefault());
+    bindSlotTooltip(slot, slotRef.get);
 
     hotbarGrid.appendChild(slot);
   }

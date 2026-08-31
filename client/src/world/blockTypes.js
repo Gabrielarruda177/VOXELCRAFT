@@ -363,6 +363,50 @@ export function isArmor(type) {
   );
 }
 
+export function getWeaponDamage(type) {
+  switch (type) {
+    case BlockType.DIAMOND_SWORD:   return 8;
+    case BlockType.IRON_SWORD:      return 6;
+    case BlockType.STONE_SWORD:     return 5;
+    case BlockType.WOODEN_SWORD:    return 4;
+    case BlockType.BOW:             return 6;
+    case BlockType.DIAMOND_PICKAXE: return 5;
+    case BlockType.IRON_PICKAXE:    return 4;
+    case BlockType.STONE_PICKAXE:   return 3;
+    case BlockType.WOODEN_PICKAXE:  return 2;
+    default: return 1;
+  }
+}
+
+export function getItemStats(type) {
+  const stats = {
+    isWeapon: isWeapon(type),
+    isArmor: isArmor(type),
+    isFood: isFood(type),
+    isTool: isPickaxe(type) || isHoe(type),
+    damage: getWeaponDamage(type),
+    defense: getArmorDefense(type),
+    hunger: getFoodNutrition(type),
+    slotName: null,
+    toolTier: null,
+  };
+
+  if (type === BlockType.IRON_HELMET || type === BlockType.DIAMOND_HELMET) stats.slotName = 'Capacete (Cabeça)';
+  else if (type === BlockType.IRON_CHESTPLATE || type === BlockType.DIAMOND_CHESTPLATE) stats.slotName = 'Peitoral (Tronco)';
+  else if (type === BlockType.IRON_LEGGINGS || type === BlockType.DIAMOND_LEGGINGS) stats.slotName = 'Calças (Pernas)';
+  else if (type === BlockType.IRON_BOOTS || type === BlockType.DIAMOND_BOOTS) stats.slotName = 'Botas (Pés)';
+
+  if (type === BlockType.DIAMOND_PICKAXE) stats.toolTier = 'Suprema (Diamante)';
+  else if (type === BlockType.IRON_PICKAXE) stats.toolTier = 'Alta (Ferro)';
+  else if (type === BlockType.STONE_PICKAXE) stats.toolTier = 'Média (Pedra)';
+  else if (type === BlockType.WOODEN_PICKAXE) stats.toolTier = 'Básica (Madeira)';
+  else if (type === BlockType.IRON_HOE) stats.toolTier = 'Arado de Ferro';
+  else if (type === BlockType.STONE_HOE) stats.toolTier = 'Arado de Pedra';
+  else if (type === BlockType.WOODEN_HOE) stats.toolTier = 'Arado de Madeira';
+
+  return stats;
+}
+
 export function getArmorDefense(type) {
   switch (type) {
     case BlockType.DIAMOND_HELMET:     return 3;

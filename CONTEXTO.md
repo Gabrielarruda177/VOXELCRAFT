@@ -1,4 +1,4 @@
-# CONTEXTO GLOBAL DO PROJETO: VOXELCRAFT 3D (v0.4.0)
+# CONTEXTO GLOBAL DO PROJETO: VOXELCRAFT 3D (v0.8.0 — Preparação para a 1.0)
 
 Este documento é a referência técnica, de arquitetura e de design central do **VoxelCraft 3D**. Ele foi elaborado para que qualquer inteligência artificial, agente ou desenvolvedor humano possa se orientar imediatamente, compreender o código-fonte, respeitar os padrões estabelecidos, entender a visão macro do jogo e continuar o desenvolvimento com máxima solidez.
 
@@ -12,7 +12,7 @@ Este documento é a referência técnica, de arquitetura e de design central do 
 
 ## 1. Visão Geral do Projeto & Cadeia de Progressão Expandida
 
-O **VoxelCraft** é um jogo sandbox voxel 3D no estilo Minecraft autêntico, desenvolvido para rodar com 60 FPS constantes, estética visual premium e zero assets externos pesados diretamente no navegador web.
+O **VoxelCraft** é um jogo sandbox voxel 3D no estilo Minecraft autêntico, desenvolvido para rodar com **60 FPS constantes**, estética visual pixel-art premium e zero assets externos pesados diretamente no navegador web.
 
 ### 🌳 O Ciclo Autêntico de Progressão (*Progression Loop*):
 ```
@@ -30,13 +30,19 @@ O **VoxelCraft** é um jogo sandbox voxel 3D no estilo Minecraft autêntico, des
         ↓
 [Era do Ferro & Combate Avançado]: 
   - Picareta de Ferro + Espada de Ferro + Enxada de Ferro
-  - Armadura Completa (Capacete, Peitoral, Calças, Botas)
+  - Armadura Completa (+15 Pontos de Defesa / Redução de Dano)
+  - Escudo Tático na Mão Secundária com Bloqueio de 100%
   - Arco de Caça (`BOW`) disparando Flechas (`ARROW`) balísticas na primeira pessoa!
         ↓
-[Sobrevivência, Agricultura & Explosivos]:
-  - Cultivo de Trigo com Enxadas e Sementes $\rightarrow$ Pão nutritivo.
-  - Combate contra Zumbis, Esqueletos Arqueiros, Aranhas e **Creepers explosivos**!
-  - Coleta de Pólvora (`GUNPOWDER`) $\rightarrow$ Fabricação de Blocos de **TNT** para mineração com crateras esféricas!
+[Automação, Redstone & Detonações]:
+  - Minério de Redstone ($Y \le 16$) $\rightarrow$ Fios condutores, Tochas lógicas, Alavancas e Placas de Pressão.
+  - Portas de Madeira e Ferro automáticas por circuitos.
+  - Detonação remota de blocos de **TNT** para mineração com crateras esféricas!
+        ↓
+[Era do Diamante, Nether & Encantamentos Arcanos]:
+  - Mineração profunda ($Y \le 12$) $\rightarrow$ Diamantes puros.
+  - Armadura Suprema de Diamante (+20 Pontos de Defesa = 80% Mitigação de Dano).
+  - Mesa de Encantamentos com Livro Místico 3D flutuante e feitiços arcanos.
 ```
 
 ---
@@ -46,191 +52,84 @@ O **VoxelCraft** é um jogo sandbox voxel 3D no estilo Minecraft autêntico, des
 ```
 VOXELCRAFT/
 ├── client/
-│   ├── index.html                 # Layout HTML, menu inicial premium v0.4.0, HUD, modais CSS
+│   ├── index.html                 # Layout HTML, menu inicial premium v0.8.0, HUD, modais CSS
 │   └── src/
 │       ├── main.js                # Bootstrap e loop central do jogo (conecta mundo, IA, fornalha, clima e saves)
 │       ├── engine/
-│       │   ├── camera.js          # Câmera FPS, Pointer Lock, sensibilidade e FOV
-│       │   ├── input.js           # Gerenciador de eventos de teclado
-│       │   ├── interaction.js     # Quebra progressiva, combate com arco/espadas, cultivo, baús e TNT
-│       │   ├── loop.js            # Game Loop baseado em requestAnimationFrame
+│       │   ├── camera.js          # Câmera FPS, Pointer Lock, 3ª Pessoa (F4), sensibilidade e FOV
+│       │   ├── input.js           # Gerenciador de eventos de teclado e mouse
+│       │   ├── interaction.js     # Quebra progressiva, combate com espadas/arcos, escudo, cultivo, baús e TNT
+│       │   ├── loop.js            # Game Loop baseado em requestAnimationFrame (60 FPS)
 │       │   ├── raycast.js         # Raycaster DDA através da grade voxel
-│       │   ├── saveManager.js     # Persistência automática no LocalStorage (mundo, inventário, posição, vida)
-│       │   └── soundFx.js         # Sintetizador procedural Web Audio API (arco, fusível do creeper, explosões, enxada)
+│       │   ├── saveManager.js     # Persistência automática no LocalStorage com migração de saves
+│       │   ├── soundFx.js         # Sintetizador procedural Web Audio API (espadas, arco, fusível, passos, etc.)
+│       │   ├── redstoneEngine.js  # Motor de Redstone com propagação de energia de 0 a 15 níveis
+│       │   └── enchantingSystem.js# Cálculo de XP, níveis e feitiços arcanos
 │       ├── entities/
-│       │   ├── player.js          # Física AABB, pulo, passos dinâmicos, mitigação de armadura e regeneração
-│       │   ├── hand.js            # Braço 3D em primeira pessoa, empunhadura e animações de ataque
-│       │   ├── mobManager.js      # IA: Zumbis, Esqueletos, Aranhas, Porcos e Creepers com explosões esféricas
+│       │   ├── player.js          # Física AABB, Fome, Saturação, Exaustão, Vida, Dano e Voo
+│       │   ├── playerModel.js     # Modelo 3D em 3ª pessoa com armaduras dinâmicas
+│       │   ├── hand.js            # Braço 3D em 1ª pessoa, empunhadura e animações de ataque
+│       │   ├── mobManager.js      # IA: Zumbis (Skins de terror com costelas expostas), Esqueletos, Aranhas, Creepers e Porcos
 │       │   └── dropManager.js     # Entidades de drops 3D flutuantes com magnetismo ao jogador
 │       ├── rendering/
 │       │   ├── sceneSetup.js      # Criação de Renderer, Scene, Luzes direcionais/ambientais e Fog
-│       │   ├── blockPreview.js    # Modelos 3D de blocos, espadas, picaretas, enxadas, arcos e comidas segurados
-│       │   ├── particles.js       # Sistema de partículas 3D (mineração, impacto, explosões e combate)
+│       │   ├── blockPreview.js    # Modelos 3D de blocos, espadas, picaretas, tochas e comidas segurados
+│       │   ├── dynamicLighting.js # Iluminação dinâmica da tocha na mão com chama animada
+│       │   ├── particles.js       # Sistema de partículas 3D (mineração, impacto, chamas e combate)
 │       │   └── textures/
-│       │       ├── textureGenerator.js # Gerador procedural 16x16 (terra arada, trigo 1..3, TNT, baú, fornalha)
-│       │       └── textureAtlas.js     # Atlas de texturas 4x16 (64 slots) e coordenadas UVs sub-texel
+│       │       ├── textureGenerator.js # Gerador procedural 16x16 de blocos e itens
+│       │       ├── textureAtlas.js     # Atlas de texturas 4x16 (64 slots) e coordenadas UVs
+│       │       └── mobTextures.js      # Skins HD pixel-art de mobs e monstros
 │       ├── ui/
 │       │   ├── uiManager.js       # Autoridade central de estados (Game State, modais e Pointer Lock)
-│       │   ├── titleScreen.js     # Gerenciador da tela inicial premium, modais de controles/configurações e pausa
+│       │   ├── titleScreen.js     # Gerenciador da tela inicial v0.8.0, modais de controles e pausa
 │       │   ├── hud.js             # Overlay de FPS, Coordenadas XYZ, Bioma, Relógio ☀️/🌙 e Voo
-│       │   ├── hotbar.js          # Barra rápida inferior sincronizada (slots 1..9)
+│       │   ├── health.js          # HUD Pixel-Art autêntica: 10 Armaduras, 10 Corações, 10 Pernis de Fome, XP
+│       │   ├── tooltip.js         # Sistema Universal de Tooltips Contextuais flutuantes
+│       │   ├── hotbar.js          # Barra rápida inferior chanfrada em pedra com destaque ativo
 │       │   ├── inventory.js       # Inventário completo (27 storage + 9 hotbar), 4 slots de armadura e 2x2 crafting
-│       │   ├── chest.js           # GUI interativa do Baú de 27 Slots com persistência por coordenadas no mundo
-│       │   ├── crafting.js        # Catálogo com 22 receitas 2x2/3x3, Bancada 3x3 e Livro de Receitas (?)
+│       │   ├── chest.js           # GUI interativa do Baú de 27 Slots com persistência no mundo
+│       │   ├── crafting.js        # Bancada 3x3, Catálogo de Receitas e Livro de Receitas (?)
 │       │   ├── furnace.js         # GUI e lógica da Fornalha (combustível, fundição de ferro, assar carnes)
-│       │   ├── health.js          # Barra de corações e barra de escudos/armadura
-│       │   └── blockIcon.js       # Gerador de ícones 2D e isométricos de itens, armas, armaduras e comidas
+│       │   ├── enchantingModal.js # Interface da Mesa de Encantamentos com Livro Místico 3D
+│       │   └── blockIcon.js       # Gerador raster 16x16 pixel-art de alta definição para todos os itens
 │       └── world/
-│           ├── blockTypes.js      # Registro de blocos, ferramentas, enxadas, arcos, sementes, trigo, pão, TNT
-│           ├── chunk.js           # Volume 16x64x16 de blocos e geração de mesh com face culling
-│           ├── dayNightCycle.js   # Ciclo 24h orbital de Sol e Lua 3D com atmosfera e névoa dinâmica
-│           ├── weather.js         # Clima dinâmico (chuva 3D procedural e escurecimento do céu)
-│           └── worldManager.js    # Biomas procedurais, Cavernas 3D com entradas e streaming infinito
-├── package.json                   # Dependências e scripts npm
-├── vite.config.js                 # Configuração do Vite
-└── CONTEXTO.md                    # Documento mestre de arquitetura
+│           ├── blockTypes.js      # Dicionário de blocos, durezas, drops, dados de armadura, dano e nutrição
+│           ├── chunk.js           # Mesh voxel otimizado com culling, tochas 3D corrigidas e vegetação cruzada
+│           └── worldManager.js    # Geração de terreno, biomas, cavernas 3D, dungeons, spawner e Nether
 ```
 
 ---
 
-## 3. Baú de Armazenamento Interativo (`chest.js`)
+## 3. Principais Sistemas e Mecânicas da v0.8.0
 
-- **Bloco de Baú (`BlockType.CHEST`)**:
-  - Fabricado na Bancada 3×3 com 8 Tábuas de Madeira ao redor do centro.
-  - Ao clicar com **Botão Direito** no Baú colocado no mundo, abre a GUI de 27 slots de armazenamento.
-- **Persistência & Transferência**:
-  - Cada baú armazena seus itens indexados pelas coordenadas mundiais `(x, y, z)`.
-  - Clicar em qualquer item da hotbar do jogador o transfere diretamente para o baú.
-  - Clicar em um item do baú o transfere de volta ao inventário do jogador.
-  - Ao quebrar o bloco do baú no cenário, todos os itens guardados dentro dele são ejetados como drops 3D flutuantes ao redor da posição.
+### 🛡 1. HUD Pixel-Art Integrada & Fisiologia do Jogador
+- **Barra de Armadura (Topo Esquerdo)**: 10 peitorais pixel-art que preenchem em cinza claro com base na defesa real equipada (até 20 pontos = 80% mitigação de dano) e escuro quando vazio.
+- **Barra de Vida (Base Esquerda)**: 10 corações vermelhos pixel-art com contorno escuro e brilho especular (cheios, meios e vazios).
+- **Barra de Fome (Direita)**: 10 pernis de carne assada que tremem em fome crítica ($\le 3$ pernis). Ações de corrida e pulo consomem exaustão calórica.
+- **Nível & XP**: Nível numérico central verde neon ("14") posicionado diretamente sobre a barra segmentada de 18 notches.
+- **Cura & Inanição**: Regeneração acelerada quando $Fome \ge 18$; dano por fome quando $Fome = 0$.
 
----
+### 💬 2. Sistema Universal de Tooltips Contextuais (`tooltip.js`)
+- Exibição de informações flutuantes no hover de qualquer slot em todos os menus (Hotbar, Inventário, Baús, Fornalha, Bancada e Encantamento).
+- Detalha Nome, Categoria, Dano de Ataque, Velocidade, Pontos de Proteção, Redução Percentual, Nutrição de Alimentos e Dicas de Teclado.
 
-## 4. Arco & Flechas Funcionais para o Jogador (`BOW` & `ARROW`)
+### 🕯 3. Tochas Vivas & Iluminação Inteligente (60 FPS)
+- **Orientação no Chão Corrigida**: Cabo de madeira assentado na base ($y0=0.0$) e chama no topo ($y1=0.65$).
+- **Chama Animada (*Flicker*)**: Variação suave de intensidade luminosa e oscilação procedural sem sobrecarga de GPU.
+- **Micro-partículas de Brasas**: Partículas quentes subindo da chama.
 
-- **Fabricação do Arco**: 3 Gravetos e 3 Linhas de Teia (`STRING`) na Bancada 3×3.
-- **Mecânica de Disparo**:
-  - Segurar e clicar com o **Botão Direito** empunhando o Arco dispara projéteis de flechas 3D na direção da mira da câmera.
-  - Consome 1 Flecha do inventário por disparo.
-  - Projétil veloz (26 blocos/s) com balística parabólica e gravidade.
-  - Causa **9 de dano crítico** ao atingir mobs (Zumbis, Esqueletos, Aranhas, Creepers ou Porcos), aplicando knockback e partículas de impacto!
-  - Áudio sintetizado de disparo (*bow twang sound*).
-
----
-
-## 5. Creeper & Sistema de Explosões Voxel (`CREEPER` & `TNT`)
-
-1. **Creeper (`MobType.CREEPER`)**:
-   - Modelo 3D característico com camuflagem verde, 4 patas e rosto icônico.
-   - **IA Furtiva & Autodestruição**:
-     - Persegue o jogador silenciosamente.
-     - Quando a menos de 3.2 blocos: para de se mover, infla de tamanho (*pulsing inflation*) e começa a chiar (*tsssss*).
-     - Contagem regressiva de 1.5s: se o jogador não se afastar para além de 5.5 blocos, **EXPLODE**!
-     - Dropa Pólvora (`GUNPOWDER`) se for eliminado antes de explodir.
-2. **Explosões Voxel Esféricas (`createVoxelExplosion`)**:
-   - Som retumbante de explosão e tremor.
-   - Destrói fisicamente todos os blocos em um raio esférico, abrindo crateras no cenário voxel.
-   - Dropa blocos destruídos como itens soltos com 40% de chance.
-   - Dano em área radial mitigado pela distância e pela armadura equipada.
-3. **Bloco de TNT (`BlockType.TNT`)**:
-   - Fabricado com 5 Pólvoras + 4 Areias intercaladas na Bancada 3×3.
-   - Ao bater ou clicar na TNT, o bloco acende, pisca em branco por 2.2s com som de pavio aceso e detona abrindo uma cratera de raio 3.8 blocos!
+### 🧟 4. Mobs com Skins de Terror HD Pixel-Art & Animações
+- **Zumbi Aterrorizante**: Costelas e esterno expostos, olhos amarelos incandescentes em órbitas ensanguentadas, roupas rasgadas e animação de ataque descendente com os braços.
+- **Creeper**: Camuflagem em mosaico de 5 tons de verde, inflação visual e piscar em branco antes de explodir o terreno voxel.
+- **Esqueleto Arqueiro**: Crânio fendido, visada balística e postura de arco armado.
+- **Aranha Noturna**: 8 olhos vermelhos e animação de caminhada em onda de 8 patas.
+- **Hit Flash (`Flash Red`)**: Mobs atingidos piscam em vermelho vivo por $0.22s$ com recuo físico (*knockback*).
 
 ---
 
-## 6. Ciclo de Agricultura & Alimentação com Trigo (`Farming`)
+## 4. Próximos Passos & Rumo à Versão 1.0
 
-- **Ferramentas de Aragem**:
-  - Enxadas de Madeira (`WOODEN_HOE`), Pedra (`STONE_HOE`) e Ferro (`IRON_HOE`).
-  - Clicar com Botão Direito na Terra (`DIRT`) ou Grama (`GRASS`) com a Enxada a transforma em **Terra Arada (`FARMLAND`)**.
-- **Coleta de Sementes & Plantio**:
-  - Quebrar grama comum possui 35% de chance de dropar **Sementes de Trigo (`WHEAT_SEEDS`)**.
-  - Clicar com as sementes na Terra Arada planta os brotos de trigo (`WHEAT_STAGE_1`).
-- **Crescimento & Colheita**:
-  - Simulação de crescimento automático através dos 3 estágios visuais (`WHEAT_STAGE_1` $\rightarrow$ `WHEAT_STAGE_2` $\rightarrow$ `WHEAT_STAGE_3`).
-  - Ao colher o trigo dourado maduro (Estágio 3), o jogador obtém **Trigo (`WHEAT`)** e novas **Sementes de Trigo**.
-- **Pão Dourado (`BREAD`)**:
-  - Fabricado na bancada com 3 Trigos alinhados horizontalmente.
-  - Alimento assado nutritivo que restaura +5 pontos de vida (2.5 corações) ao clicar com botão direito!
-
----
-
-## 7. Atlas de Texturas Expandido (4×16 - 64 Slots)
-
-O atlas de texturas procedurais agora conta com 36 texturas renderizadas em 64×256 pixels com sub-texel insets:
-- `0..27`: Grama, Terra, Pedra, Areia, Neve, Troncos, Folhas, Minérios, Água, Cactos, Fornalhas, Baús, etc.
-- `28`: `farmland_top` (Sulcos arados escuros)
-- `29`: `farmland_side` (Perfil de terra arada)
-- `30..32`: `wheat_stage1`, `wheat_stage2`, `wheat_stage3` (Estágios de plantação de trigo)
-- `33..35`: `tnt_top`, `tnt_side` (com faixa branca e letras pretas TNT), `tnt_bottom`
-
----
-
-## 8. Design System Visual, Modais Glassmorphism & Tailwind UI Tokens (`index.html`, `inventory.js`, `furnace.js`, `crafting.js`, `chest.js`)
-
-- **Tipografia Moderna & Ícones**:
-  - `Space Grotesk`: Títulos e botões principais com impacto visual e efeito `title-glow`.
-  - `JetBrains Mono`: Badges técnicos, tags, contadores numéricos, coordenadas e atalhos de teclado.
-  - `Inter`: Textos de leitura e descrições dos modais.
-  - `Google Material Symbols Outlined`: Ícones dinâmicos de alta definição (`play_arrow`, `local_fire_department`, `backpack`, `construction`, `inventory_2`, `menu_book`, etc.).
-- **Fundo Dinâmico Shader GLSL**:
-  - Shader procedural Simplex Noise com gradiente dark-green/deep-space e partículas de poeira cósmica/voxel flutuantes em tempo real via WebGL canvas (`#shader-canvas-ANIMATION_2`).
-- **Interface do Inventário & Crafting (`inventory.js`)**:
-  - Layout dividido em quadrantes:
-    - **Survival Crafting (2×2)**: Grade de fabricação rápida com seta direcional e slot de saída forjado (`active` glow).
-    - **Personagem & Armadura**: 4 slots de equipamento com ícones semânticos (`security`, `checkroom`, `accessibility`, `directions_run`), silhueta do jogador e slot de escudo.
-    - **Mochila (27 slots)**: Grade 9×3 com bordas adaptativas, contadores em badge e suporte a transferência por clique.
-    - **Barra Rápida (Hotbar 1..9)**: Destaque visual verde brilhante no item atualmente selecionado em mãos.
-- **Interface da Fornalha Industrial (`furnace.js`)**:
-  - Header com ícone de chama ardente.
-  - **Câmara de Combustão**: Slots ampliados de Entrada (`INPUT`) e Combustível (`FUEL`), com animação de calor pulsante e altura da chama mascarada conforme o consumo do carvão/madeira.
-  - **Barra de Progresso de Fundição**: Barra com transição suave e ícone de seta dourada.
-  - **Slot de Saída Master**: Slot ampliado com efeito de brilho suave e botões de ação integrados (*Parar* e *Coletar*).
-  - Faixa inferior de acesso rápido para carregar itens da hotbar direto para a fornalha.
-- **Bancada de Trabalho 3×3 & Livro de Receitas (`crafting.js`)**:
-  - Matriz 3×3 com guia visual de receitas interativo em cards ilustrados com diagramas em miniatura de montagem.
-
----
-
-## 9. Organização Global, Spawn Condicional & Otimização de CPU (v0.4.1)
-
-A versão **v0.4.1** implementou uma revisão profunda de organização do ecossistema, física visual e balanceamento de CPU:
-
-- **Orientação Frontal dos Mobs (`yaw + Math.PI`)**:
-  - Corrigido o bug visual do porco e outros mobs andando de costas. A rotação do modelo 3D agora é perfeitamente alinhada ao vetor de velocidade, garantindo que cabeça, olhos e focinho liderem a caminhada naturalmente.
-- **Spawn Condicional Autêntico**:
-  - **Fim dos monstros no início do jogo**: Ao nascer no mundo (dia ensolarado), apenas 2 a 3 porcos pacíficos surgirão na área de grama ao redor.
-  - **Monstros Noturnos/Subterrâneos**: Zumbis, Esqueletos, Creepers e Aranhas **só surgem à noite ou em cavernas profundas**, sempre a uma distância segura (**entre 24 e 38 blocos do jogador**), nunca caindo em cima do jogador.
-- **Balanceamento Realista de IA & Velocidades**:
-  - **Zumbi**: Velocidade de `1.8` blocos/s (caminhada lenta cadenciada de morto-vivo). Queima sob o sol a céu aberto.
-  - **Esqueleto**: Velocidade de `1.8` blocos/s, mantém distância tática (8 a 14 blocos) e tempo de recarga de tiro de `2.8s`, permitindo esquiva.
-  - **Creeper**: Velocidade de `1.8` blocos/s. Tempo de pavio (*fuse*) de `1.8s` com animação de inflação e som de aviso, dando janela de tempo para o jogador recuar.
-  - **Aranha**: Velocidade de `2.8` blocos/s. **Neutralidade diurna**: à luz do dia, a aranha permanece pacífica a menos que seja atacada pelo jogador.
-  - **Porco**: Caminhada tranquila (`0.9` blocos/s) e fuga rápida (`2.8` blocos/s) ao receber dano.
-- **Otimização Extrema de CPU & Despawn Inteligente**:
-  - **Cap de Mobs Ativos (`MAX_MOBS = 10`)**: Limite global rígido de 10 entidades no mundo, impedindo acúmulo de processamento.
-  - **Despawn Automático por Distância**: Mobs a mais de **52 blocos** de distância do jogador são automaticamente removidos da cena.
-  - **Teto Global de Drops (`MAX_DROPS = 30`)**: Limite de 30 itens flutuantes no mundo com descarte automático dos mais antigos e suporte polimórfico de spawn.
-  - **Validação de Saves no LocalStorage**: Proteção defensiva com limites numéricos contra posições `NaN` ou saves corrompidos.
-
----
-
-## 10. Backlog & Sugestões para os Próximos Passos (v0.5.0)
-
-Caso deseje continuar expandindo o ecossistema nas próximas iterações:
-
-1. **Geração de Aldeias & Vilões (NPCs / Villagers)**:
-   - Casas de madeira e pedra geradas proceduralmente nos biomas de Planície.
-   - Aldeões que trocam itens por Esmeraldas.
-2. **Ciclo de Minérios Raros (Diamante & Ouro)**:
-   - Minério de Diamante e Ouro em profundidades inferiores (y < 12).
-   - Picareta e Espada de Diamante com dureza e durabilidade extremas.
-3. **Bioma de Pântano com Vitórias-Régias e Slimes**:
-   - Águas turvas verdes, cipós nas árvores e Slimes saltitantes.
-4. **Porta de Madeira e Janelas de Vidro**:
-   - Fundir Areia na Fornalha $\rightarrow$ Vidro transparente.
-   - Portas de madeira interativas que abrem e fecham com clique.
-
----
-
-*Documento gerado e mantido rigorosamente atualizado pelo assistente Antigravity para a versão v0.4.1.*
+1. **Biomas e Clima Expansivo**: Neve acumulada em biomas glaciais, tempestades e trovões volumétricos.
+2. **Dimensão do Fim (The End) & Boss Dragon**: Acesso via portal do fim para a batalha final da versão 1.0.
+3. **Sons Ambiente Subterrâneos**: Ecos e gotas de água em cavernas profundas.

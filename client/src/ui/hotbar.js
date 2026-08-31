@@ -9,6 +9,7 @@ import { isKeyDown } from '../engine/input.js';
 import { createBlockIconCanvas } from './blockIcon.js';
 import { getHotbarSlots, getHotbarSlotObjects, setHotbarSelectedIndex, isInventoryOpen } from './inventory.js';
 import { ITEM_NAMES } from '../world/blockTypes.js';
+import { bindSlotTooltip } from './tooltip.js';
 
 let selectedIndex = 0;
 let hotbarEl = null;
@@ -84,6 +85,8 @@ export function initHotbar() {
       display: 'none',
     });
     slot.appendChild(countBadge);
+
+    bindSlotTooltip(slot, () => getHotbarSlotObjects()[i]);
 
     frame.appendChild(slot);
   }

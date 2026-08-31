@@ -17,6 +17,7 @@ import {
   handleSlotClick,
   updateCursorVisual,
 } from './cursorManager.js';
+import { bindSlotTooltip } from './tooltip.js';
 
 // Recipes: Input BlockType -> Output BlockType
 const SMELT_RECIPES = {
@@ -247,6 +248,7 @@ function renderFurnaceSlots() {
   };
   inputEl.onmousedown = (e) => handleSlotClick(inputSlotRef, e, renderFurnaceSlots);
   inputEl.oncontextmenu = (e) => e.preventDefault();
+  bindSlotTooltip(inputEl, inputSlotRef.get);
 
   // 2. Render Fuel Slot
   fuelEl.innerHTML = '';
@@ -277,6 +279,7 @@ function renderFurnaceSlots() {
   };
   fuelEl.onmousedown = (e) => handleSlotClick(fuelSlotRef, e, renderFurnaceSlots);
   fuelEl.oncontextmenu = (e) => e.preventDefault();
+  bindSlotTooltip(fuelEl, fuelSlotRef.get);
 
   // 3. Render Flame & Progress
   const burnPct = f.maxBurnTime > 0 ? Math.min(100, Math.round((f.burnTimeRemaining / f.maxBurnTime) * 100)) : 0;
@@ -303,6 +306,7 @@ function renderFurnaceSlots() {
     label.textContent = 'PRODUTO';
     outputEl.appendChild(label);
   }
+  bindSlotTooltip(outputEl, () => ({ type: f.outputItem, count: f.outputCount }));
 
   outputEl.onmousedown = (e) => {
     e.preventDefault();
@@ -389,6 +393,7 @@ function renderFurnaceSlots() {
 
     slot.addEventListener('mousedown', (e) => handleSlotClick(slotRef, e, renderFurnaceSlots));
     slot.addEventListener('contextmenu', (e) => e.preventDefault());
+    bindSlotTooltip(slot, slotRef.get);
 
     hotbarEl.appendChild(slot);
   }

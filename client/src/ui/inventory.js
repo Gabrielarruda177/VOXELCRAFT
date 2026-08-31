@@ -19,6 +19,7 @@ import {
   handleSlotClick,
   updateCursorVisual,
 } from './cursorManager.js';
+import { bindSlotTooltip } from './tooltip.js';
 
 // Default initial items for player
 const INITIAL_HOTBAR = [
@@ -584,6 +585,7 @@ export function renderInventorySlots() {
 
     slot.addEventListener('mousedown', (e) => handleSlotClick(slotRef, e, renderInventorySlots));
     slot.addEventListener('contextmenu', (e) => e.preventDefault());
+    bindSlotTooltip(slot, slotRef.get);
 
     armorGrid.appendChild(slot);
   }
@@ -617,6 +619,7 @@ export function renderInventorySlots() {
 
     slot.addEventListener('mousedown', (e) => handleSlotClick(slotRef, e, renderInventorySlots));
     slot.addEventListener('contextmenu', (e) => e.preventDefault());
+    bindSlotTooltip(slot, slotRef.get);
 
     craft2x2Grid.appendChild(slot);
   }
@@ -634,6 +637,7 @@ export function renderInventorySlots() {
       craft2x2Output.appendChild(badge);
     }
   }
+  bindSlotTooltip(craft2x2Output, () => ({ type: current2x2Output?.result || 0, count: current2x2Output?.count || 0 }));
 
   craft2x2Output.onmousedown = (e) => {
     e.preventDefault();
@@ -756,6 +760,7 @@ function createSlotElement(index, parentEl, isHotbar = false, isSelected = false
 
   slot.addEventListener('mousedown', (e) => handleSlotClick(slotRef, e, renderInventorySlots));
   slot.addEventListener('contextmenu', (e) => e.preventDefault());
+  bindSlotTooltip(slot, slotRef.get);
 
   parentEl.appendChild(slot);
 }

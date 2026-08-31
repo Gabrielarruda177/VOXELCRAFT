@@ -51,6 +51,8 @@ let camera = null;
 const pos = new THREE.Vector3();
 let velocity = new THREE.Vector3();
 let health = MAX_HEALTH;
+let hunger = 20; // 20 points = 10 drumsticks
+let hungerExhaustion = 0.0;
 let onGround = false;
 let isFlying = false;
 let inWater = false;
@@ -70,6 +72,23 @@ let coyoteTimer = 0;
 let jumpBufferTimer = 0;
 const spacePressTimes = [];
 let prevSpaceDown = false;
+
+export function getHunger() {
+  return hunger;
+}
+
+export function getMaxHunger() {
+  return 20;
+}
+
+export function feedPlayer(amount) {
+  hunger = Math.min(20, hunger + amount);
+}
+
+export function consumeFood(amount, heal = 0) {
+  feedPlayer(amount);
+  if (heal > 0) healPlayer(heal);
+}
 
 // ── Public API ─────────────────────────────────────────────
 

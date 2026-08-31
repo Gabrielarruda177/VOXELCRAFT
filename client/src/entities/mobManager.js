@@ -73,32 +73,41 @@ export function hasLineOfSight(x0, y0, z0, x1, y1, z1) {
   return true;
 }
 
-// ── 3D Model Builders ─────────────────────────────────────
+import {
+  createZombieHeadTexture,
+  createZombieBodyTexture,
+  createZombieLimbTexture,
+  createZombieLegsTexture,
+  createCreeperFaceTexture,
+  createCreeperBodyTexture,
+  createSkeletonHeadTexture,
+  createSkeletonBodyTexture,
+  createSpiderHeadTexture,
+  createSpiderBodyTexture,
+  createPigFaceTexture,
+  createSheepFaceTexture,
+} from '../rendering/textures/mobTextures.js';
 
 function createPigModel() {
   const group = new THREE.Group();
+  const faceTex = createPigFaceTexture();
+  const faceMat = new THREE.MeshLambertMaterial({ map: faceTex });
   const pinkMat = new THREE.MeshLambertMaterial({ color: 0xf472b6 });
   const snoutMat = new THREE.MeshLambertMaterial({ color: 0xfb7185 });
-  const eyeMat = new THREE.MeshLambertMaterial({ color: 0x1f2937 });
 
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.5, 0.9), pinkMat);
   body.position.set(0, 0.45, 0);
   group.add(body);
 
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45), pinkMat);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.45, 0.45), [
+    pinkMat, pinkMat, pinkMat, pinkMat, pinkMat, faceMat,
+  ]);
   head.position.set(0, 0.65, -0.55);
   group.add(head);
 
   const snout = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.16, 0.12), snoutMat);
   snout.position.set(0, 0.58, -0.80);
   group.add(snout);
-
-  const leftEye = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.02), eyeMat);
-  leftEye.position.set(-0.16, 0.72, -0.78);
-  const rightEye = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.02), eyeMat);
-  rightEye.position.set(0.16, 0.72, -0.78);
-  group.add(leftEye);
-  group.add(rightEye);
 
   const legGeo = new THREE.BoxGeometry(0.18, 0.35, 0.18);
   const legs = [];
@@ -121,16 +130,16 @@ function createPigModel() {
     legs,
     head,
     body,
-    originalMats: [pinkMat, snoutMat],
+    originalMats: [pinkMat, snoutMat, faceMat],
   };
 }
 
 function createSheepModel() {
   const group = new THREE.Group();
+  const faceTex = createSheepFaceTexture();
+  const faceMat = new THREE.MeshLambertMaterial({ map: faceTex });
   const woolMat = new THREE.MeshLambertMaterial({ color: 0xf8fafc });
   const skinMat = new THREE.MeshLambertMaterial({ color: 0x334155 });
-  const snoutMat = new THREE.MeshLambertMaterial({ color: 0xfb7185 });
-  const eyeMat = new THREE.MeshLambertMaterial({ color: 0x0f172a });
 
   // Fluffy Wool Body
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.60, 0.95), woolMat);
@@ -138,27 +147,11 @@ function createSheepModel() {
   group.add(body);
 
   // Head
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), skinMat);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), [
+    skinMat, skinMat, woolMat, skinMat, skinMat, faceMat,
+  ]);
   head.position.set(0, 0.68, -0.55);
   group.add(head);
-
-  // Wool cap on head
-  const woolCap = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.20, 0.44), woolMat);
-  woolCap.position.set(0, 0.86, -0.55);
-  group.add(woolCap);
-
-  // Snout
-  const snout = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.12), snoutMat);
-  snout.position.set(0, 0.60, -0.78);
-  group.add(snout);
-
-  // Eyes
-  const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.02), eyeMat);
-  eyeL.position.set(-0.16, 0.74, -0.76);
-  const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.02), eyeMat);
-  eyeR.position.set(0.16, 0.74, -0.76);
-  group.add(eyeL);
-  group.add(eyeR);
 
   // 4 Legs
   const legGeo = new THREE.BoxGeometry(0.16, 0.36, 0.16);
@@ -182,44 +175,51 @@ function createSheepModel() {
     legs,
     head,
     body,
-    originalMats: [woolMat, skinMat],
+    originalMats: [woolMat, skinMat, faceMat],
   };
 }
 
 function createZombieModel() {
   const group = new THREE.Group();
-  const skinMat = new THREE.MeshLambertMaterial({ color: 0x3b823e });
-  const shirtMat = new THREE.MeshLambertMaterial({ color: 0x06b6d4 });
-  const pantsMat = new THREE.MeshLambertMaterial({ color: 0x1e3a8a });
-  const eyeMat = new THREE.MeshLambertMaterial({ color: 0x0f172a });
+  const headTex = createZombieHeadTexture();
+  const bodyTex = createZombieBodyTexture();
+  const armTex = createZombieLimbTexture();
+  const legTex = createZombieLegsTexture();
 
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.44, 0.44), skinMat);
+  const headMat = new THREE.MeshLambertMaterial({ map: headTex });
+  const bodyMat = new THREE.MeshLambertMaterial({ map: bodyTex });
+  const armMat = new THREE.MeshLambertMaterial({ map: armTex });
+  const legMat = new THREE.MeshLambertMaterial({ map: legTex });
+  const skinMat = new THREE.MeshLambertMaterial({ color: 0x2d5a27 });
+
+  // Head
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.44, 0.44), [
+    skinMat, skinMat, skinMat, skinMat, skinMat, headMat,
+  ]);
   head.position.set(0, 1.45, 0);
   group.add(head);
 
-  const leftEye = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.02), eyeMat);
-  leftEye.position.set(-0.12, 1.48, -0.23);
-  const rightEye = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.02), eyeMat);
-  rightEye.position.set(0.12, 1.48, -0.23);
-  group.add(leftEye);
-  group.add(rightEye);
-
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.50, 0.65, 0.28), shirtMat);
+  // Torso with Exposed Ribcage
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.50, 0.65, 0.28), [
+    skinMat, skinMat, skinMat, skinMat, skinMat, bodyMat,
+  ]);
   torso.position.set(0, 0.90, 0);
   group.add(torso);
 
+  // Arms (Stretched forward in iconic zombie pose)
   const armGeo = new THREE.BoxGeometry(0.16, 0.16, 0.55);
-  const leftArm = new THREE.Mesh(armGeo, skinMat);
+  const leftArm = new THREE.Mesh(armGeo, armMat);
   leftArm.position.set(-0.35, 1.05, -0.26);
-  const rightArm = new THREE.Mesh(armGeo, skinMat);
+  const rightArm = new THREE.Mesh(armGeo, armMat);
   rightArm.position.set(0.35, 1.05, -0.26);
   group.add(leftArm);
   group.add(rightArm);
 
+  // Legs with ragged trousers
   const legGeo = new THREE.BoxGeometry(0.20, 0.60, 0.22);
-  const leftLeg = new THREE.Mesh(legGeo, pantsMat);
+  const leftLeg = new THREE.Mesh(legGeo, legMat);
   leftLeg.position.set(-0.13, 0.30, 0);
-  const rightLeg = new THREE.Mesh(legGeo, pantsMat);
+  const rightLeg = new THREE.Mesh(legGeo, legMat);
   rightLeg.position.set(0.13, 0.30, 0);
   group.add(leftLeg);
   group.add(rightLeg);
@@ -230,28 +230,29 @@ function createZombieModel() {
     arms: [leftArm, rightArm],
     head,
     body: torso,
-    originalMats: [skinMat, shirtMat, pantsMat],
+    originalMats: [headMat, bodyMat, armMat, legMat, skinMat],
   };
 }
 
 function createSkeletonModel() {
   const group = new THREE.Group();
-  const boneMat = new THREE.MeshLambertMaterial({ color: 0xd1d5db });
-  const eyeMat = new THREE.MeshLambertMaterial({ color: 0x0f172a });
+  const headTex = createSkeletonHeadTexture();
+  const bodyTex = createSkeletonBodyTexture();
+
+  const headMat = new THREE.MeshLambertMaterial({ map: headTex });
+  const bodyMat = new THREE.MeshLambertMaterial({ map: bodyTex });
+  const boneMat = new THREE.MeshLambertMaterial({ color: 0xe2e8f0 });
   const bowMat = new THREE.MeshLambertMaterial({ color: 0x78350f });
 
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), boneMat);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.42, 0.42), [
+    boneMat, boneMat, boneMat, boneMat, boneMat, headMat,
+  ]);
   head.position.set(0, 1.45, 0);
   group.add(head);
 
-  const leftEye = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.07, 0.02), eyeMat);
-  leftEye.position.set(-0.11, 1.46, -0.22);
-  const rightEye = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.07, 0.02), eyeMat);
-  rightEye.position.set(0.11, 1.46, -0.22);
-  group.add(leftEye);
-  group.add(rightEye);
-
-  const ribcage = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.60, 0.22), boneMat);
+  const ribcage = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.60, 0.22), [
+    boneMat, boneMat, boneMat, boneMat, boneMat, bodyMat,
+  ]);
   ribcage.position.set(0, 0.90, 0);
   group.add(ribcage);
 
@@ -283,41 +284,42 @@ function createSkeletonModel() {
     arms: [leftArm, rightArm],
     head,
     body: ribcage,
-    originalMats: [boneMat, bowMat],
+    bow,
+    originalMats: [headMat, bodyMat, boneMat, bowMat],
   };
 }
 
 function createSpiderModel() {
   const group = new THREE.Group();
-  const bodyMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
-  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+  const headTex = createSpiderHeadTexture();
+  const bodyTex = createSpiderBodyTexture();
 
-  const abdomen = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.45, 0.70), bodyMat);
+  const headMat = new THREE.MeshLambertMaterial({ map: headTex });
+  const bodyMat = new THREE.MeshLambertMaterial({ map: bodyTex });
+  const darkMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
+
+  const abdomen = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.45, 0.70), [
+    darkMat, darkMat, darkMat, darkMat, bodyMat, darkMat,
+  ]);
   abdomen.position.set(0, 0.35, 0.40);
   group.add(abdomen);
 
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.35, 0.45), bodyMat);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.35, 0.45), [
+    darkMat, darkMat, darkMat, darkMat, darkMat, headMat,
+  ]);
   head.position.set(0, 0.30, -0.25);
   group.add(head);
-
-  const eyeGeo = new THREE.BoxGeometry(0.06, 0.06, 0.02);
-  const e1 = new THREE.Mesh(eyeGeo, eyeMat);
-  e1.position.set(-0.12, 0.32, -0.48);
-  const e2 = new THREE.Mesh(eyeGeo, eyeMat);
-  e2.position.set(0.12, 0.32, -0.48);
-  group.add(e1);
-  group.add(e2);
 
   const legGeo = new THREE.BoxGeometry(0.60, 0.08, 0.08);
   const legs = [];
   for (let i = 0; i < 4; i++) {
-    const leftLeg = new THREE.Mesh(legGeo, bodyMat);
+    const leftLeg = new THREE.Mesh(legGeo, darkMat);
     leftLeg.position.set(-0.45, 0.22, -0.3 + i * 0.22);
     leftLeg.rotation.z = 0.35;
     group.add(leftLeg);
     legs.push(leftLeg);
 
-    const rightLeg = new THREE.Mesh(legGeo, bodyMat);
+    const rightLeg = new THREE.Mesh(legGeo, darkMat);
     rightLeg.position.set(0.45, 0.22, -0.3 + i * 0.22);
     rightLeg.rotation.z = -0.35;
     group.add(rightLeg);
@@ -329,31 +331,26 @@ function createSpiderModel() {
     legs,
     head,
     body: abdomen,
-    originalMats: [bodyMat, eyeMat],
+    originalMats: [headMat, bodyMat, darkMat],
   };
 }
 
 function createCreeperModel() {
   const group = new THREE.Group();
-  const skinMat = new THREE.MeshLambertMaterial({ color: 0x15803d });
-  const faceMat = new THREE.MeshLambertMaterial({ color: 0x0f172a });
+  const faceTex = createCreeperFaceTexture();
+  const bodyTex = createCreeperBodyTexture();
 
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.46, 0.46), skinMat);
+  const faceMat = new THREE.MeshLambertMaterial({ map: faceTex });
+  const bodyMat = new THREE.MeshLambertMaterial({ map: bodyTex });
+  const skinMat = new THREE.MeshLambertMaterial({ color: 0x16a34a });
+
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.46, 0.46), [
+    bodyMat, bodyMat, bodyMat, bodyMat, bodyMat, faceMat,
+  ]);
   head.position.set(0, 1.45, 0);
   group.add(head);
 
-  // Creeper iconic face
-  const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.02), faceMat);
-  eyeL.position.set(-0.11, 1.50, -0.24);
-  const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.02), faceMat);
-  eyeR.position.set(0.11, 1.50, -0.24);
-  const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.16, 0.02), faceMat);
-  mouth.position.set(0, 1.36, -0.24);
-  group.add(eyeL);
-  group.add(eyeR);
-  group.add(mouth);
-
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.65, 0.26), skinMat);
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.65, 0.26), bodyMat);
   torso.position.set(0, 0.90, 0);
   group.add(torso);
 
@@ -367,7 +364,7 @@ function createCreeperModel() {
   ];
 
   for (const pos of legPositions) {
-    const leg = new THREE.Mesh(legGeo, skinMat);
+    const leg = new THREE.Mesh(legGeo, bodyMat);
     leg.position.set(...pos);
     group.add(leg);
     legs.push(leg);
@@ -378,7 +375,7 @@ function createCreeperModel() {
     legs,
     head,
     body: torso,
-    originalMats: [skinMat, faceMat],
+    originalMats: [faceMat, bodyMat, skinMat],
   };
 }
 
@@ -445,6 +442,7 @@ export function spawnMob(type, x, y, z) {
     isAngered: false,
     burnTimer: 0,
     onGround: true,
+    flashRedTimer: 0,
   };
 
   mobs.push(mob);
@@ -455,6 +453,7 @@ export function hitMob(mob, damage, knockbackDir) {
   if (!mob || mob.health <= 0) return;
 
   mob.health -= damage;
+  mob.flashRedTimer = 0.22; // Red hit flash effect
   playMobHitSound();
   spawnHitParticles(mob.pos.x, mob.pos.y + mob.eyeHeight * 0.5, mob.pos.z);
 
@@ -866,6 +865,70 @@ function updateSingleMob(mob, dt, playerPos, distToPlayer) {
   mob.model.group.position.copy(mob.pos);
   // Rotate by PI so head points forward in the direction of movement
   mob.model.group.rotation.y = mob.yaw + Math.PI;
+
+  // ── Hit Flash & Pain Recoil Animation ──────────────────
+  if (mob.flashRedTimer > 0) {
+    mob.flashRedTimer -= dt;
+    mob.model.group.traverse((child) => {
+      if (child.isMesh && child.material) {
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        mats.forEach((m) => {
+          if (m.emissive) {
+            m.emissive.setHex(0xef4444);
+            m.emissiveIntensity = 0.85;
+          }
+        });
+      }
+    });
+    mob.model.group.rotation.x = -0.22;
+  } else {
+    mob.model.group.traverse((child) => {
+      if (child.isMesh && child.material) {
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        mats.forEach((m) => {
+          if (m.emissive) {
+            m.emissive.setHex(0x000000);
+            m.emissiveIntensity = 0.0;
+          }
+        });
+      }
+    });
+    mob.model.group.rotation.x = 0;
+  }
+
+  // ── Limb Walking & Attack Animations ────────────────────
+  const speedSq = mob.vel.x * mob.vel.x + mob.vel.z * mob.vel.z;
+  const isMoving = speedSq > 0.05;
+  const time = performance.now() * 0.005;
+
+  if (mob.model.legs && mob.model.legs.length >= 2) {
+    if (mob.type === MobType.SPIDER) {
+      for (let i = 0; i < mob.model.legs.length; i++) {
+        mob.model.legs[i].rotation.x = isMoving ? Math.sin(time * 2 + i) * 0.35 : 0;
+      }
+    } else if (mob.model.legs.length === 4) {
+      // Quadruped trotting (Pig / Sheep / Creeper)
+      mob.model.legs[0].rotation.x = isMoving ? Math.sin(time * 1.5) * 0.5 : 0;
+      mob.model.legs[1].rotation.x = isMoving ? -Math.sin(time * 1.5) * 0.5 : 0;
+      mob.model.legs[2].rotation.x = isMoving ? -Math.sin(time * 1.5) * 0.5 : 0;
+      mob.model.legs[3].rotation.x = isMoving ? Math.sin(time * 1.5) * 0.5 : 0;
+    } else if (mob.model.legs.length === 2) {
+      // Biped walking (Zombie / Skeleton)
+      mob.model.legs[0].rotation.x = isMoving ? Math.sin(time * 1.5) * 0.5 : 0;
+      mob.model.legs[1].rotation.x = isMoving ? -Math.sin(time * 1.5) * 0.5 : 0;
+    }
+  }
+
+  // Zombie Attack Arm Slash
+  if (mob.type === MobType.ZOMBIE && mob.model.arms && mob.model.arms.length === 2) {
+    if (distToPlayer < 2.0) {
+      mob.model.arms[0].rotation.x = -Math.PI * 0.45 + Math.sin(time * 3) * 0.5;
+      mob.model.arms[1].rotation.x = -Math.PI * 0.45 + Math.cos(time * 3) * 0.5;
+    } else {
+      mob.model.arms[0].rotation.x = -Math.PI * 0.5;
+      mob.model.arms[1].rotation.x = -Math.PI * 0.5;
+    }
+  }
 }
 
 function updateCreeperAI(mob, dt, playerPos, distToPlayer) {

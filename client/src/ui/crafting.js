@@ -11,6 +11,7 @@ import {
   handleSlotClick,
   updateCursorVisual,
 } from './cursorManager.js';
+import { bindSlotTooltip } from './tooltip.js';
 
 let craftingTableModal = null;
 let recipeBookModal = null;
@@ -1170,6 +1171,7 @@ export function renderCraftingTableGrid() {
 
     slot.addEventListener('mousedown', (e) => handleSlotClick(slotRef, e, renderCraftingTableGrid));
     slot.addEventListener('contextmenu', (e) => e.preventDefault());
+    bindSlotTooltip(slot, slotRef.get);
 
     gridEl.appendChild(slot);
   });
@@ -1187,6 +1189,7 @@ export function renderCraftingTableGrid() {
       outputEl.appendChild(badge);
     }
   }
+  bindSlotTooltip(outputEl, () => ({ type: currentTableOutput?.result || 0, count: currentTableOutput?.count || 0 }));
 
   outputEl.onmousedown = (e) => {
     e.preventDefault();
@@ -1281,6 +1284,7 @@ export function renderCraftingTableGrid() {
 
     slot.addEventListener('mousedown', (e) => handleSlotClick(slotRef, e, renderCraftingTableGrid));
     slot.addEventListener('contextmenu', (e) => e.preventDefault());
+    bindSlotTooltip(slot, slotRef.get);
 
     hotbarEl.appendChild(slot);
   }
