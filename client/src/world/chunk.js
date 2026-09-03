@@ -274,10 +274,14 @@ export class Chunk {
 
   _makeMesh(pos, norm, uv, idx, material) {
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-    geometry.setIndex(idx);
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(pos), 3));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(new Float32Array(norm), 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(uv), 2));
+    
+    // Choose Uint16Array if vertex count is small to save GPU VRAM bandwidth
+    const maxIdx = pos.length / 3;
+    const indexArray = maxIdx < 65535 ? new Uint16Array(idx) : new Uint32Array(idx);
+    geometry.setIndex(new THREE.BufferAttribute(indexArray, 1));
     return new THREE.Mesh(geometry, material);
   }
 

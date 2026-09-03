@@ -15,10 +15,15 @@ let scene = null;
  * @returns {THREE.WebGLRenderer}
  */
 export function createRenderer() {
-  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    powerPreference: 'high-performance',
+    stencil: false,
+    depth: true,
+  });
   renderer.domElement.id = 'game-canvas';
   renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.setClearColor(0x78b9e8); // Soft sky blue
   renderer.shadowMap.enabled = false; // Shadows off for performance in Phase 1
   document.body.appendChild(renderer.domElement);
@@ -54,8 +59,8 @@ export function createScene() {
   sunlight.position.set(80, 120, 50);
   scene.add(sunlight);
 
-  // Fog for depth and atmosphere
-  scene.fog = new THREE.Fog(0x78b9e8, 50, 160);
+  // Fog calibrated for render radius (starts at 35 blocks, reaches solid sky at 65 blocks)
+  scene.fog = new THREE.Fog(0x78b9e8, 35, 65);
 
   return scene;
 }

@@ -8,7 +8,7 @@
 
 import * as THREE from 'three';
 import { getCamera, isPointerLocked, getCameraMode, CameraMode } from '../engine/camera.js';
-import { getSelectedBlockType } from '../engine/interaction.js';
+import { getSelectedBlockType, isMiningActive } from '../engine/interaction.js';
 import { getPlayerState } from './player.js';
 import { getBlockPreviewMesh } from '../rendering/blockPreview.js';
 import { BlockType, isWeapon } from '../world/blockTypes.js';
@@ -31,6 +31,7 @@ let currentItemType = -1;
 let swingProgress = 1;
 let swingSpeed = 5.8;
 let bobPhase = 0;
+let miningSwingPhase = 0;
 
 export function initHand() {
   const camera = getCamera();
@@ -116,23 +117,38 @@ export function updateHand(dt, time) {
 
   updateHeldItem();
 
-  // ── Swing Animation ──────────────────────────────────
+  // ── Swing & Mining Animation ─────────────────────────
   let swingRotX = 0;
   let swingRotY = 0;
   let swingRotZ = 0;
   let swingTransY = 0;
   let swingTransZ = 0;
 
-  if (swingProgress < 1) {
-    const speed = isWeapon(currentItemType) ? 6.2 : swingSpeed;
-    swingProgress = Math.min(1, swingProgress + dt * speed);
-    const s = Math.sin(swingProgress * Math.PI);
+  const isMining = isMiningActive();
 
-    swingRotX = -s * 1.05;
-    swingRotY = s * 0.60;
-    swingRotZ = -s * 0.40;
-    swingTransY = -s * 0.09;
-    swingTransZ = -s * 0.14;
+  if (isMining) {
+    // Continuous rhythmic mining stroke while holding click
+    miningSwingPhase += dt * 8.5;
+    const s = Math.abs(Math.sin(miningSwingPhase));
+
+    swingRotX = -s * 0.95;
+    swingRotY = s * 0.50;
+    swingRotZ = -s * 0.35;
+    swingTransY = -s * 0.08;
+    swingTransZ = -s * 0.12;
+  } else {
+    miningSwingPhase = 0;
+    if (swingProgress < 1) {
+      const speed = isWeapon(currentItemType) ? 6.2 : swingSpeed;
+      swingProgress = Math.min(1, swingProgress + dt * speed);
+      const s = Math.sin(swingProgress * Math.PI);
+
+      swingRotX = -s * 1.05;
+      swingRotY = s * 0.60;
+      swingRotZ = -s * 0.40;
+      swingTransY = -s * 0.09;
+      swingTransZ = -s * 0.14;
+    }
   }
 
   // ── Walking Bobbing ──────────────────────────────────

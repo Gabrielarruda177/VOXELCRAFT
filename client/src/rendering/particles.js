@@ -32,13 +32,29 @@ const BLOCK_COLORS = {
   [BlockType.NETHER_QUARTZ_ORE]: 0xf8fafc,
   [BlockType.QUARTZ_BLOCK]:    0xf1f5f9,
   [BlockType.NETHER_PORTAL]:   0xa855f7,
+  [BlockType.REDSTONE_ORE]:    0xef4444,
 };
 
 let scene = null;
 const activeParticles = [];
+const MAX_PARTICLES = 120; // FPS Protection cap
 const particleGeo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
 const sparkGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
 const critGeo = new THREE.BoxGeometry(0.09, 0.09, 0.09);
+
+// Material Cache to avoid GC spikes and WebGL recompilation
+const materialCache = new Map();
+
+function getCachedMaterial(color, isBasic = false) {
+  const key = `${color}_${isBasic ? 'basic' : 'lambert'}`;
+  if (!materialCache.has(key)) {
+    const mat = isBasic
+      ? new THREE.MeshBasicMaterial({ color })
+      : new THREE.MeshLambertMaterial({ color });
+    materialCache.set(key, mat);
+  }
+  return materialCache.get(key);
+}
 
 export function initParticles(s) {
   scene = s;
@@ -48,10 +64,12 @@ export function spawnBlockBreakParticles(x, y, z, blockType) {
   if (!scene) return;
 
   const color = BLOCK_COLORS[blockType] || 0xaaaaaa;
-  const count = 12;
+  const mat = getCachedMaterial(color, false);
+  const count = 8; // Optimized from 12 for smoother 60+ FPS
 
   for (let i = 0; i < count; i++) {
-    const mat = new THREE.MeshLambertMaterial({ color });
+    if (activeParticles.length >= MAX_PARTICLES) break;
+
     const mesh = new THREE.Mesh(particleGeo, mat);
 
     mesh.position.set(
@@ -60,12 +78,12 @@ export function spawnBlockBreakParticles(x, y, z, blockType) {
       z + 0.2 + Math.random() * 0.6
     );
 
-    const vx = (Math.random() - 0.5) * 4.5;
-    const vy = Math.random() * 4.0 + 1.5;
-    const vz = (Math.random() - 0.5) * 4.5;
+    const vx = (Math.random() - 0.5) * 4.0;
+    const vy = Math.random() * 3.5 + 1.2;
+    const vz = (Math.random() - 0.5) * 4.0;
 
-    const rx = (Math.random() - 0.5) * 10;
-    const ry = (Math.random() - 0.5) * 10;
+    const rx = (Math.random() - 0.5) * 8;
+    const ry = (Math.random() - 0.5) * 8;
 
     scene.add(mesh);
 
@@ -76,7 +94,7 @@ export function spawnBlockBreakParticles(x, y, z, blockType) {
       vz,
       rx,
       ry,
-      life: 0.6 + Math.random() * 0.3,
+      life: 0.5 + Math.random() * 0.25,
       age: 0,
     });
   }

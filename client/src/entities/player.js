@@ -178,7 +178,8 @@ export function respawn() {
 // ── Collision Helpers ─────────────────────────────────────
 
 function solidAt(wx, wy, wz) {
-  if (wy < 0) return true;
+  if (wy <= 0) return true; // Ground bedrock is always solid
+  if (wy >= 64) return false;
   return isSolid(getBlockAtWorld(wx, wy, wz));
 }
 

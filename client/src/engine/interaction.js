@@ -43,6 +43,7 @@ import { openEnchantingTable } from '../ui/enchantingModal.js';
 import { isAnyWindowOpen } from '../ui/uiManager.js';
 import { healPlayer, getPlayerPosition, getPlayerState } from '../entities/player.js';
 import { removeItemFromHotbar, hasItemInInventory, consumeItemFromInventory } from '../ui/inventory.js';
+import { getUVsForTexture, getAtlasTexture } from '../rendering/textures/textureAtlas.js';
 
 let scene = null;
 let highlightMesh = null;
@@ -67,17 +68,42 @@ const highlightMat = new THREE.LineBasicMaterial({
   color: 0x000000,
   linewidth: 2,
   transparent: true,
-  opacity: 0.6,
+  opacity: 0.65,
 });
 
-// Cracking overlay box
-const crackGeo = new THREE.BoxGeometry(1.006, 1.006, 1.006);
-const crackMat = new THREE.MeshBasicMaterial({
-  color: 0x1e1b4b,
-  wireframe: true,
-  transparent: true,
-  opacity: 0.0,
-});
+// Cracking overlay box with atlas UV mapping
+const crackGeo = new THREE.BoxGeometry(1.004, 1.004, 1.004);
+let crackMat = null;
+
+function getCrackMaterial() {
+  if (!crackMat) {
+    crackMat = new THREE.MeshBasicMaterial({
+      map: getAtlasTexture(),
+      transparent: true,
+      depthTest: true,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+    });
+  }
+  return crackMat;
+}
+
+function updateCrackUVs(stageIndex) {
+  // Texture indices 63 to 68 correspond to destroy_stage_0 to destroy_stage_5
+  const texIdx = 63 + Math.max(0, Math.min(5, stageIndex));
+  const uvInfo = getUVsForTexture(texIdx);
+  const uvs = crackGeo.attributes.uv.array;
+
+  for (let face = 0; face < 6; face++) {
+    const base = face * 8;
+    uvs[base + 0] = uvInfo.uMin; uvs[base + 1] = uvInfo.vMax;
+    uvs[base + 2] = uvInfo.uMax; uvs[base + 3] = uvInfo.vMax;
+    uvs[base + 4] = uvInfo.uMin; uvs[base + 5] = uvInfo.vMin;
+    uvs[base + 6] = uvInfo.uMax; uvs[base + 7] = uvInfo.vMin;
+  }
+  crackGeo.attributes.uv.needsUpdate = true;
+}
 
 export function initInteraction(s) {
   scene = s;
@@ -86,7 +112,7 @@ export function initInteraction(s) {
   highlightMesh.visible = false;
   scene.add(highlightMesh);
 
-  crackMesh = new THREE.Mesh(crackGeo, crackMat);
+  crackMesh = new THREE.Mesh(crackGeo, getCrackMaterial());
   crackMesh.visible = false;
   scene.add(crackMesh);
 
@@ -98,6 +124,10 @@ export function initInteraction(s) {
     breakProgress = 0.0;
     if (crackMesh) crackMesh.visible = false;
   });
+}
+
+export function isMiningActive() {
+  return isLeftMouseDown && isBreakingBlock;
 }
 
 export function updateInteraction(dt = 0.016) {
@@ -148,16 +178,18 @@ export function updateInteraction(dt = 0.016) {
 
         // Mining impact ticks & dust particles
         hitTickTimer += dt;
-        if (hitTickTimer >= 0.22) {
+        if (hitTickTimer >= 0.20) {
           hitTickTimer = 0;
           playBlockHitTickSound(blockType);
           spawnBlockBreakParticles(result.hit.x, result.hit.y, result.hit.z, blockType);
         }
 
-        // Cracking overlay visual
+        // Cracking overlay visual with 6 discrete stages (0 to 5)
+        const stage = Math.min(5, Math.floor(breakProgress * 6));
+        updateCrackUVs(stage);
+
         crackMesh.position.set(result.hit.x + 0.5, result.hit.y + 0.5, result.hit.z + 0.5);
         crackMesh.visible = true;
-        crackMat.opacity = THREE.MathUtils.clamp(breakProgress * 0.85, 0.15, 0.9);
 
         // Block Break Completed!
         if (breakProgress >= 1.0) {

@@ -19,8 +19,8 @@ const chunkMeshes = new Map();
 const chunkWaterMeshes = new Map();
 
 export const SEA_LEVEL = 18;
-const RENDER_RADIUS = 5;  // Active chunk radius (11×11 chunks)
-const UNLOAD_RADIUS = 7;  // Distance threshold to unload far chunks
+const RENDER_RADIUS = 3;  // Optimized active chunk radius (7×7 = 49 chunks instead of 121 for huge FPS boost)
+const UNLOAD_RADIUS = 4;  // Tighter threshold to prevent VRAM memory leak and massive draw calls
 
 let currentScene = null;
 let lastPlayerChunkX = NaN;

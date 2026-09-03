@@ -113,51 +113,47 @@ export function updateDayNightCycle(dt, scene, camera, renderer = null) {
   updateAtmosphere(dt, scene, renderer);
 }
 
-function sampleColorPalette(palette, t) {
+const tempSkyColor = new THREE.Color();
+const tempFogColor = new THREE.Color();
+
+function sampleColorPalette(palette, t, targetColor) {
   // t is 0.0 .. 1.0
   if (t < 0.15) {
-    // dawn -> morning
     const k = t / 0.15;
-    return palette.dawn.clone().lerp(palette.morning, k);
+    return targetColor.copy(palette.dawn).lerp(palette.morning, k);
   } else if (t < 0.25) {
-    // morning -> noon
     const k = (t - 0.15) / 0.10;
-    return palette.morning.clone().lerp(palette.noon, k);
+    return targetColor.copy(palette.morning).lerp(palette.noon, k);
   } else if (t < 0.50) {
-    // noon -> sunset
     const k = (t - 0.25) / 0.25;
-    return palette.noon.clone().lerp(palette.sunset, k);
+    return targetColor.copy(palette.noon).lerp(palette.sunset, k);
   } else if (t < 0.58) {
-    // sunset -> dusk
     const k = (t - 0.50) / 0.08;
-    return palette.sunset.clone().lerp(palette.dusk, k);
+    return targetColor.copy(palette.sunset).lerp(palette.dusk, k);
   } else if (t < 0.75) {
-    // dusk -> midnight
     const k = (t - 0.58) / 0.17;
-    return palette.dusk.clone().lerp(palette.midnight, k);
+    return targetColor.copy(palette.dusk).lerp(palette.midnight, k);
   } else if (t < 0.92) {
-    // midnight -> predawn
     const k = (t - 0.75) / 0.17;
-    return palette.midnight.clone().lerp(palette.predawn, k);
+    return targetColor.copy(palette.midnight).lerp(palette.predawn, k);
   } else {
-    // predawn -> dawn
     const k = (t - 0.92) / 0.08;
-    return palette.predawn.clone().lerp(palette.dawn, k);
+    return targetColor.copy(palette.predawn).lerp(palette.dawn, k);
   }
 }
 
 function updateAtmosphere(dt, scene, renderer) {
-  const currentSky = sampleColorPalette(SKY_COLORS, timeOfDay);
-  const currentFog = sampleColorPalette(FOG_COLORS, timeOfDay);
+  sampleColorPalette(SKY_COLORS, timeOfDay, tempSkyColor);
+  sampleColorPalette(FOG_COLORS, timeOfDay, tempFogColor);
 
   if (scene) {
     if (scene.fog) {
-      scene.fog.color.copy(currentFog);
+      scene.fog.color.copy(tempFogColor);
     }
   }
 
   if (renderer) {
-    renderer.setClearColor(currentSky);
+    renderer.setClearColor(tempSkyColor);
   }
 
   // Dynamic light intensity

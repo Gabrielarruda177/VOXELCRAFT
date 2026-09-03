@@ -887,6 +887,80 @@ function drawBookshelfSide(ctx, size) {
   ctx.fillStyle = '#e11d48'; ctx.fillRect(11, 9, 2, 5);
 }
 
+// ── Authentic Minecraft-Style Breaking Cracks (Stages 0 to 5) ────────
+function drawDestroyStage0(ctx, size) {
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+  // Small center hairline fractures
+  ctx.fillRect(7, 7, 2, 2);
+  ctx.fillRect(6, 6, 1, 1);
+  ctx.fillRect(9, 8, 1, 1);
+}
+
+function drawDestroyStage1(ctx, size) {
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+  ctx.fillRect(7, 7, 2, 2);
+  ctx.fillRect(5, 5, 2, 1);
+  ctx.fillRect(9, 8, 2, 1);
+  ctx.fillRect(6, 9, 1, 2);
+  ctx.fillRect(8, 4, 1, 2);
+}
+
+function drawDestroyStage2(ctx, size) {
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+  // Expanding cross fractures
+  ctx.fillRect(7, 7, 2, 2);
+  ctx.fillRect(4, 4, 3, 1);
+  ctx.fillRect(9, 8, 4, 1);
+  ctx.fillRect(6, 9, 1, 4);
+  ctx.fillRect(8, 3, 1, 3);
+  ctx.fillRect(3, 8, 2, 1);
+  ctx.fillRect(11, 4, 2, 1);
+}
+
+function drawDestroyStage3(ctx, size) {
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.88)';
+  ctx.fillRect(6, 6, 4, 4);
+  ctx.fillRect(2, 3, 4, 1);
+  ctx.fillRect(9, 3, 4, 1);
+  ctx.fillRect(3, 10, 4, 1);
+  ctx.fillRect(10, 11, 4, 1);
+  ctx.fillRect(3, 4, 1, 6);
+  ctx.fillRect(12, 4, 1, 7);
+  ctx.fillRect(7, 1, 2, 5);
+  ctx.fillRect(7, 10, 2, 5);
+}
+
+function drawDestroyStage4(ctx, size) {
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.92)';
+  ctx.fillRect(5, 5, 6, 6);
+  ctx.fillRect(1, 2, 6, 2);
+  ctx.fillRect(9, 2, 6, 2);
+  ctx.fillRect(2, 9, 5, 2);
+  ctx.fillRect(9, 9, 6, 2);
+  ctx.fillRect(2, 2, 2, 12);
+  ctx.fillRect(12, 2, 2, 12);
+  ctx.fillRect(6, 0, 4, 6);
+  ctx.fillRect(6, 10, 4, 6);
+}
+
+function drawDestroyStage5(ctx, size) {
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
+  // Complete spiderweb shattering
+  ctx.fillRect(4, 4, 8, 8);
+  ctx.fillRect(0, 1, size, 2);
+  ctx.fillRect(0, 8, size, 2);
+  ctx.fillRect(0, 13, size, 2);
+  ctx.fillRect(1, 0, 2, size);
+  ctx.fillRect(8, 0, 2, size);
+  ctx.fillRect(13, 0, 2, size);
+}
+
 // ── Export: texture definitions ───────────────────────────
 
 export const TEXTURE_DEFS = [
@@ -954,6 +1028,13 @@ export const TEXTURE_DEFS = [
   { name: 'mossy_cobblestone',   draw: drawMossyCobblestone },   // 60
   { name: 'monster_spawner',     draw: drawMonsterSpawner },     // 61
   { name: 'bookshelf_side',      draw: drawBookshelfSide },      // 62
+  // Breaking Stages (Cracking animation)
+  { name: 'destroy_stage_0',     draw: drawDestroyStage0 },      // 63
+  { name: 'destroy_stage_1',     draw: drawDestroyStage1 },      // 64
+  { name: 'destroy_stage_2',     draw: drawDestroyStage2 },      // 65
+  { name: 'destroy_stage_3',     draw: drawDestroyStage3 },      // 66
+  { name: 'destroy_stage_4',     draw: drawDestroyStage4 },      // 67
+  { name: 'destroy_stage_5',     draw: drawDestroyStage5 },      // 68
 ];
 
 /**

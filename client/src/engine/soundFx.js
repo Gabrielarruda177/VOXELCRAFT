@@ -77,29 +77,49 @@ export function playFlyToggleSound(flying) {
   osc.stop(now + 0.2);
 }
 
-export function playBlockBreakSound() {
+export function playBlockBreakSound(blockType = 3) {
   const ctx = getAudioContext();
   if (!ctx) return;
 
   const now = ctx.currentTime;
-  const bufferSize = ctx.sampleRate * 0.08;
+  const bufferSize = Math.floor(ctx.sampleRate * 0.12);
   const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
   const data = buffer.getChannelData(0);
   for (let i = 0; i < bufferSize; i++) {
-    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+    data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.28));
   }
 
   const noise = ctx.createBufferSource();
   noise.buffer = buffer;
 
   const filter = ctx.createBiquadFilter();
-  filter.type = 'lowpass';
-  filter.frequency.setValueAtTime(800, now);
-  filter.frequency.exponentialRampToValueAtTime(150, now + 0.08);
+  
+  // Custom acoustic resonant profiles
+  if (blockType === 28) {
+    // Obsidian: Deep heavy stone crack
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(600, now);
+    filter.Q.setValueAtTime(4.0, now);
+  } else if (blockType === 27 || blockType === 35 || blockType === 38) {
+    // Diamond / Quartz / Redstone ore: Crystalline snap
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(1400, now);
+    filter.frequency.exponentialRampToValueAtTime(250, now + 0.11);
+  } else if (blockType === 6 || blockType === 12 || blockType === 16 || blockType === 20) {
+    // Wood / Planks: Woody snap
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(450, now);
+    filter.frequency.exponentialRampToValueAtTime(80, now + 0.11);
+  } else {
+    // Stone / Cobble / Dirt default
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(950, now);
+    filter.frequency.exponentialRampToValueAtTime(120, now + 0.11);
+  }
 
   const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.35, now);
-  gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+  gain.gain.setValueAtTime(0.42, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
 
   noise.connect(filter);
   filter.connect(gain);
