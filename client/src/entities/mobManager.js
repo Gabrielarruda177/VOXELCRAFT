@@ -15,7 +15,7 @@
 
 import * as THREE from 'three';
 import { isWorldBlockSolid, getHeight, setBlockAtWorld, getBlockAtWorld } from '../world/worldManager.js';
-import { BlockType, getBlockDrop } from '../world/blockTypes.js';
+import { BlockType, getBlockDrop, isFluid } from '../world/blockTypes.js';
 import { getPlayerPosition, damage as damagePlayer } from './player.js';
 import {
   playPigSound,
@@ -441,6 +441,9 @@ export function spawnMob(type, x, y, z) {
     isFusing: false,
     isAngered: false,
     burnTimer: 0,
+    lavaTimer: 0,
+    inLava: false,
+    inWater: false,
     onGround: true,
     flashRedTimer: 0,
   };
@@ -759,6 +762,28 @@ function trySpawnNaturalMob(playerPos) {
 }
 
 function updateSingleMob(mob, dt, playerPos, distToPlayer) {
+  // ── Environment Fluids: lava burns, water buoys and drags ──
+  const envX = Math.floor(mob.pos.x);
+  const envZ = Math.floor(mob.pos.z);
+  const feetType = getBlockAtWorld(envX, Math.floor(mob.pos.y + 0.15), envZ);
+  mob.inLava = feetType === BlockType.LAVA;
+  mob.inWater = feetType === BlockType.WATER;
+
+  if (mob.inLava) {
+    mob.lavaTimer += dt;
+    if (mob.lavaTimer >= 0.5) {
+      mob.lavaTimer = 0;
+      mob.health -= 4;
+      spawnHitParticles(mob.pos.x, mob.pos.y + 0.8, mob.pos.z, 0xf97316);
+      if (mob.health <= 0) {
+        killMob(mob);
+        return;
+      }
+    }
+  } else {
+    mob.lavaTimer = 0;
+  }
+
   // Sunlight burn for Zombies and Skeletons
   if ((mob.type === MobType.ZOMBIE || mob.type === MobType.SKELETON) && isDaytime()) {
     const topY = getHeight(Math.floor(mob.pos.x), Math.floor(mob.pos.z));
@@ -814,7 +839,17 @@ function updateSingleMob(mob, dt, playerPos, distToPlayer) {
   }
 
   // ── True 3D Voxel Collision & Gravity ─────────────────────
-  mob.vel.y -= 24 * dt; // Gravity
+  // Fluids change the fall: lava is a thick tar, water buoys mobs to the surface.
+  const gravityScale = mob.inLava ? 0.2 : mob.inWater ? 0.25 : 1;
+  mob.vel.y -= 24 * gravityScale * dt;
+  if (mob.inWater || mob.inLava) {
+    // Buoyancy: rise while submerged, then damp at the waterline.
+    const centerY = Math.floor(mob.pos.y + mob.eyeHeight * 0.5);
+    const submerged = isFluid(getBlockAtWorld(envX, centerY, envZ));
+    if (submerged) mob.vel.y += 34 * dt;
+    mob.vel.y *= Math.exp(-(submerged ? 3.0 : 6.0) * dt);
+    mob.vel.y = Math.max(mob.vel.y, -3.5);
+  }
   mob.pos.addScaledVector(mob.vel, dt);
 
   const blockX = Math.floor(mob.pos.x);

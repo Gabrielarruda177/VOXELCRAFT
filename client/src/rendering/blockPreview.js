@@ -393,6 +393,55 @@ function createFlintAndSteelMesh() {
 }
 
 /**
+ * Bucket in hand: a tapered iron pail, optionally filled with a fluid.
+ * `fillColor === 0` yields the empty bucket.
+ */
+function createBucketMesh(fillColor = 0) {
+  const group = new THREE.Group();
+
+  const ironMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.42, metalness: 0.65 });
+  const ironDarkMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.5, metalness: 0.6 });
+
+  // Tapered body: a wider top ring faked with a slightly larger rim box.
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.055, 0.16, 10, 1, true), ironMat);
+  body.material.side = THREE.DoubleSide;
+  body.position.y = -0.03;
+  group.add(body);
+
+  const bottom = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.012, 10), ironDarkMat);
+  bottom.position.y = -0.11;
+  group.add(bottom);
+
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.076, 0.011, 6, 12), ironMat);
+  rim.rotation.x = Math.PI / 2;
+  rim.position.y = 0.05;
+  group.add(rim);
+
+  // Wire handle
+  const handleMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.4, metalness: 0.7 });
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.007, 5, 12, Math.PI), handleMat);
+  handle.rotation.y = Math.PI / 2;
+  handle.position.y = 0.05;
+  group.add(handle);
+
+  if (fillColor !== 0) {
+    const fluidMat = new THREE.MeshStandardMaterial({
+      color: fillColor,
+      emissive: fillColor,
+      emissiveIntensity: 0.35,
+      roughness: 0.25,
+      transparent: true,
+      opacity: 0.9,
+    });
+    const fluid = new THREE.Mesh(new THREE.CylinderGeometry(0.070, 0.070, 0.01, 10), fluidMat);
+    fluid.position.y = 0.02;
+    group.add(fluid);
+  }
+
+  return group;
+}
+
+/**
  * Get a 3D preview mesh for any item or block.
  * @param {number} itemType
  * @param {number} size
@@ -435,6 +484,9 @@ export function getBlockPreviewMesh(itemType, size = 0.22) {
   if (itemType === BlockType.IRON_SHIELD) return createShieldMesh(true);
   if (itemType === BlockType.BOOK) return create3DBookMesh();
   if (itemType === BlockType.BOAT) return create3DBoatMesh();
+  if (itemType === BlockType.EMPTY_BUCKET) return createBucketMesh(0);
+  if (itemType === BlockType.WATER) return createBucketMesh(0x38bdf8);
+  if (itemType === BlockType.LAVA) return createBucketMesh(0xf97316);
 
   // Torches & Redstone Torch
   if (itemType === BlockType.TORCH || itemType === BlockType.REDSTONE_TORCH) {

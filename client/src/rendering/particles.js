@@ -245,11 +245,10 @@ export function spawnTorchFlameParticles(x, y, z) {
 export function spawnWaterSplashParticles(x, y, z) {
   if (!scene) return;
 
-  const count = 10;
-  for (let i = 0; i < count; i++) {
-    const mat = new THREE.MeshBasicMaterial({ color: 0x93c5fd });
-    const mesh = new THREE.Mesh(sparkGeo, mat);
+  const mat = getCachedMaterial(0x9ecbff, true);
 
+  for (let i = 0; i < 8; i++) {
+    const mesh = new THREE.Mesh(sparkGeo, mat);
     mesh.position.set(x, y + 0.1, z);
 
     const angle = Math.random() * Math.PI * 2;
@@ -266,6 +265,63 @@ export function spawnWaterSplashParticles(x, y, z) {
       ry: 4,
       life: 0.4 + Math.random() * 0.2,
       age: 0,
+      sharedMaterial: true,
+    });
+  }
+}
+
+/**
+ * Steam + obsidian spark burst fired when water quenches lava.
+ */
+export function spawnFluidReactionParticles(x, y, z) {
+  if (!scene) return;
+
+  const steamMat = getCachedMaterial(0xe8f4ff, true);
+  const sparkMat = getCachedMaterial(0xff8c1a, true);
+
+  for (let i = 0; i < 6; i++) {
+    const mesh = new THREE.Mesh(sparkGeo, steamMat);
+    mesh.position.set(x, y, z);
+
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.8 + Math.random() * 1.6;
+
+    scene.add(mesh);
+
+    activeParticles.push({
+      mesh,
+      vx: Math.cos(angle) * speed,
+      vy: 1.6 + Math.random() * 2.4,
+      vz: Math.sin(angle) * speed,
+      rx: 2,
+      ry: 2,
+      life: 0.55 + Math.random() * 0.35,
+      age: 0,
+      gravity: 0.55,
+      sharedMaterial: true,
+    });
+  }
+
+  for (let i = 0; i < 5; i++) {
+    const mesh = new THREE.Mesh(critGeo, sparkMat);
+    mesh.position.set(x, y, z);
+
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1.6 + Math.random() * 2.2;
+
+    scene.add(mesh);
+
+    activeParticles.push({
+      mesh,
+      vx: Math.cos(angle) * speed,
+      vy: 1.0 + Math.random() * 2.6,
+      vz: Math.sin(angle) * speed,
+      rx: 6,
+      ry: 6,
+      life: 0.35 + Math.random() * 0.3,
+      age: 0,
+      gravity: 0.8,
+      sharedMaterial: true,
     });
   }
 }
@@ -278,13 +334,14 @@ export function updateParticles(dt) {
     if (p.age >= p.life) {
       scene.remove(p.mesh);
       p.mesh.geometry.dispose();
-      p.mesh.material.dispose();
+      // Cached materials are shared — only dispose the per-particle ones.
+      if (!p.sharedMaterial) p.mesh.material.dispose();
       activeParticles.splice(i, 1);
       continue;
     }
 
-    // Apply gravity
-    p.vy -= 9.8 * dt;
+    // Apply gravity (steam rises slowly, debris falls at full rate)
+    p.vy -= (p.gravity !== undefined ? p.gravity : 1) * 9.8 * dt;
 
     p.mesh.position.x += p.vx * dt;
     p.mesh.position.y += p.vy * dt;

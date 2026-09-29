@@ -3,7 +3,7 @@
  * Precision 1-by-1 Placement, Drag-and-Drop, and Unified Slot Management.
  */
 
-import { BlockType, isWeapon, isPickaxe, isHoe, isArmor } from '../world/blockTypes.js';
+import { BlockType, isWeapon, isPickaxe, isHoe, isArmor, isBucket } from '../world/blockTypes.js';
 import { createBlockIconCanvas } from './blockIcon.js';
 import { playCraftSound, playInventorySound } from '../engine/soundFx.js';
 
@@ -19,6 +19,7 @@ export function getMaxStack(type) {
     isPickaxe(type) ||
     isHoe(type) ||
     isArmor(type) ||
+    isBucket(type) ||
     type === BlockType.BOW
   ) {
     return 1;

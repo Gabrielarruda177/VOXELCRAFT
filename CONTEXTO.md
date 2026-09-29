@@ -1,4 +1,4 @@
-# CONTEXTO GLOBAL DO PROJETO: VOXELCRAFT 3D (v0.8.5 — Arquitetura de Referência & Rumo à 1.0)
+# CONTEXTO GLOBAL DO PROJETO: VOXELCRAFT 3D (v0.9.0 — Arquitetura de Referência & Rumo à 1.0)
 
 Este documento é a referência técnica, enciclopédica, arquitetural e de design central do **VoxelCraft 3D**. Ele foi elaborado para que qualquer inteligência artificial, agente ou desenvolvedor humano possa se orientar imediatamente, compreender o código-fonte, respeitar os padrões estabelecidos, entender a visão macro do ecossistema e evoluir o projeto com máxima solidez.
 
@@ -29,7 +29,8 @@ O **VoxelCraft** é um jogo sandbox voxel 3D no estilo Minecraft autêntico, des
 [Barra de Ferro (Lingote)] & [Bife Assado] & [Pão Dourado de Trigo]
         ↓
 [Era do Ferro & Combate Avançado]: 
-  - Picareta de Ferro + Espada de Ferro + Enxada de Ferro + Balde
+  - Picareta de Ferro + Espada de Ferro + Enxada de Ferro
+  - **Balde Vazio** (3 Barras de Ferro) $\rightarrow$ enche na água ou lava e verte fontes infinitas
   - Armadura Completa (+15 Pontos de Defesa / Redução de Dano)
   - Escudo Tático na Mão Secundária com Bloqueio de 100%
   - Arco de Caça (`BOW`) disparando Flechas (`ARROW`) balísticas na primeira pessoa!
@@ -44,6 +45,12 @@ O **VoxelCraft** é um jogo sandbox voxel 3D no estilo Minecraft autêntico, des
   - Armadura Suprema de Diamante (+20 Pontos de Defesa = 80% Mitigação de Dano).
   - Portal do Nether em Obsidiana ($4 \times 5$) aceso com Isqueiro (`Flint & Steel`) $\rightarrow$ Dimensão Netherrack, Glowstone, Areia das Almas e Quartzo.
   - Mesa de Encantamentos cercada por Estantes de Livros com Livro Místico 3D flutuante e feitiços arcanos (`Sharpness`, `Protection`, `Efficiency`, `Fire Aspect`, `Unbreaking`).
+        ↓
+[Sistemas Ambientais de Fluidos & Cavernas (v0.9.0)]:
+  - Rios, Lagos e Mares de Lava com **fluxo contínuo agendado** (níveis 0→7) e decaimento por distância.
+  - Água e Lava vertem **Obsidiana** (fonte) ou **Pedregulho** (fluxo) ao se encontrarem.
+  - Correntes **empurram** o jogador e os mobs; a lava queima, afunda e proíbe o salto.
+  - **Névoa subaquática** densa, hora de afogar ($6\,\text{s}$) e ambiente cavernoso com ecos e gotas procedurais.
         ↓
 [Rumo ao The End & Batalha Final (v1.0)]:
   - Olhos de Ender $\rightarrow$ Localização de Stronghold $\rightarrow$ Portal do Fim $\rightarrow$ Dragão Ender.
@@ -60,26 +67,31 @@ VOXELCRAFT/
 │   └── src/
 │       ├── main.js                # Bootstrap e loop central do jogo (conecta mundo, IA, fornalha, clima e saves)
 │       ├── engine/
-│       │   ├── camera.js          # Câmera FPS, Pointer Lock, 3ª Pessoa (F4), sensibilidade e FOV
-│       │   ├── input.js           # Gerenciador de eventos de teclado e mouse
-│       │   ├── interaction.js     # Quebra progressiva, combate com espadas/arcos, escudo, cultivo, baús e TNT
-│       │   ├── loop.js            # Game Loop (60 FPS renderização + atualização desacoplada)
-│       │   ├── raycast.js         # Raycaster DDA através da grade voxel
-│       │   ├── saveManager.js     # Persistência automática no LocalStorage com migração de saves
-│       │   ├── soundFx.js         # Sintetizador procedural Web Audio API (espadas, arco, fusível, passos, etc.)
-│       │   ├── redstoneEngine.js  # Motor de Redstone com propagação BFS de energia (0 a 15 níveis)
-│       │   └── enchantingSystem.js# Cálculo de XP, níveis e feitiços arcanos
+        │       │   ├── camera.js          # Câmera FPS, Pointer Lock, 3ª Pessoa (F4), sensibilidade e FOV
+        │       │   ├── input.js           # Gerenciador de eventos de teclado e mouse
+        │       │   ├── interaction.js     # Quebra progressiva, combate com espadas/arcos, baldes, cultivo, baús e TNT
+        │       │   ├── loop.js            # Game Loop (60 FPS renderização + atualização desacoplada)
+        │       │   ├── raycast.js         # Raycaster DDA através da grade voxel (com detecção opcional de fluidos)
+        │       │   ├── saveManager.js     # Persistência automática no LocalStorage com migração de saves
+        │       │   ├── soundFx.js         # Sintetizador procedural Web Audio API (espadas, arco, fusível, passos, fluidos, cavernas)
+        │       │   ├── fluidEngine.js     # Motor de fluidos: tiques agendados, gravidade, propagação e reações água/lava
+        │       │   ├── redstoneEngine.js  # Motor de Redstone com propagação BFS de energia (0 a 15 níveis)
+        │       │   └── enchantingSystem.js# Cálculo de XP, níveis e feitiços arcanos
+
 │       ├── entities/
-│       │   ├── player.js          # Física AABB, Fome, Saturação, Exaustão, Vida, Dano e Voo
+        │       │   ├── player.js          # Física AABB, Fome, Saturação, Exaustão, Vida, Dano, Voo e física de fluidos
+
 │       │   ├── playerModel.js     # Modelo 3D em 3ª pessoa com armaduras dinâmicas
 │       │   ├── hand.js            # Braço 3D em 1ª pessoa, empunhadura e animações de ataque
-│       │   ├── mobManager.js      # IA: Zumbis (Skins de terror), Esqueletos, Aranhas, Creepers e Porcos
+        │       │   ├── mobManager.js      # IA: Zumbis, Esqueletos, Aranhas, Creepers e Porcos (com queima em lava e empuxo de fluidos)
+
 │       │   └── dropManager.js     # Entidades de drops 3D flutuantes com magnetismo ao jogador
 │       ├── rendering/
 │       │   ├── sceneSetup.js      # Criação de Renderer, Scene, Luzes direcionais/ambientais e Fog
 │       │   ├── blockPreview.js    # Modelos 3D de blocos, espadas, picaretas, tochas e comidas segurados
 │       │   ├── dynamicLighting.js # Iluminação dinâmica da tocha na mão com chama animada
-│       │   ├── particles.js       # Sistema de partículas 3D (mineração, impacto, chamas e combate)
+        │       │   ├── particles.js       # Sistema de partículas 3D (mineração, impacto, chamas, combate e respingos de fluído)
+
 │       │   └── textures/
 │       │       ├── textureGenerator.js # Gerador procedural 16x16 de blocos e itens
 │       │       ├── textureAtlas.js     # Atlas de texturas 4x16 (64 slots) e coordenadas UVs
@@ -96,11 +108,14 @@ VOXELCRAFT/
 │       │   ├── crafting.js        # Bancada 3x3, Catálogo de Receitas e Livro de Receitas (?)
 │       │   ├── furnace.js         # GUI e lógica da Fornalha (combustível, fundição de ferro, assar carnes)
 │       │   ├── enchantingModal.js # Interface da Mesa de Encantamentos com Livro Místico 3D
-│       │   └── blockIcon.js       # Gerador raster 16x16 pixel-art de alta definição para todos os itens
-│       └── world/
-│           ├── blockTypes.js      # Dicionário de blocos, durezas, drops, dados de armadura, dano e nutrição
-│           ├── chunk.js           # Mesh voxel otimizado com culling, tochas 3D e vegetação cruzada
-│           └── worldManager.js    # Geração procedural, biomas, cavernas 3D, dungeons, spawner e Nether
+        │       │   ├── cursorManager.js   # Cursor flutuante, divisão de pilhas e regras de empilhamento por item
+        │       │   └── blockIcon.js       # Gerador raster 16x16 pixel-art de alta definição para todos os itens
+        │       └── world/
+        │           ├── blockTypes.js      # Blocos, durezas, drops, armaduras, dano, nutrição e metadados de fluído
+        │           ├── chunk.js           # Mesh voxel com culling, tochas 3D, vegetação e malhas de fluído por nível
+        │           ├── dayNightCycle.js   # Ciclo de 24h com sol/lua, paleta de céu, névoa e modo submerso
+        │           └── worldManager.js    # Biomas, cavernas 3D, dungeons, Nether, remesh e API de fluidos
+
 ```
 
 ---
@@ -173,6 +188,71 @@ $$\text{Redução Percentual} = \text{Pontos de Defesa} \times 4\% \quad (\text{
 
 ## 4. Arquitetura dos Subsistemas
 
+### 🌊 4. Motor de Fluidos Dinâmicos (`fluidEngine.js`) — *v0.9.0*
+
+O sistema de fluídos é o subsistema mais exigente em desempenho do jogo. Ele roda sobre um **modelo de níveis de 8 bits** armazenado em um array paralelo por chunk (`chunk.fluid`), com malhas separadas para água e lava, para que a água tenha shader próprio sem afetar a lava.
+
+#### Modelo de Níveis e Altura Renderizada
+
+| Nível | Semântica | Altura Renderizada | Comportamento |
+| :--- | :--- | :--- | :--- |
+| `0` (`FLUID_SOURCE_LEVEL`) | **Fonte** (balde, acordada do mar) | $\tfrac{7}{8} \approx 0.875$ | Escoa infinitamente, enche os lados e cai para baixo |
+| `1 \sim 7` (`FLUID_MAX_FLOW_LEVEL`) | **Fluxo** | $1 - \tfrac{n+1}{8}$ (mínimo $\tfrac{1}{9}$) | Decai 1 nível por bloco; o nível 7 não se espalha |
+| `15` (`FLUID_STATIC`) | **Estático procedural** (oceanos, mares de lava) | $\tfrac{7}{8}$ | **Nunca é agendado**; renderiza e interage, mas só acorda como fonte quando um vizinho vira ar |
+
+> A altura mínima de $\tfrac{1}{9}$ garante que o nível 7 continue visível — faces de altura zero produziriam geometria degenerada.
+
+#### Regras de Simulação
+- **Atraso por tique**: Água $0.25\,\text{s}$ e Lava $1.50\,\text{s}$ por tique (a lava é preguiçosa e deliberadamente cara).
+- **Orçamento por frame**: máximo de **96 tiques** e **2 remeshes** por frame, com fila deduplicada (`Map` com chave `x,y,z`; o tempo mais cedo sempre vence).
+- **Justiça da fila**: a varredura é limitada a **1536 entradas por frame** e separada do orçamento de tiques. Como cada mudança de bloco acorda até 6 vizinhos, um pico de mineração entulha a fila de no-ops; eles são descartados de graça, e só o trabalho real consome os 96 tiques. Sem isso, rajadas de água drenando podiam atrasar uma fonte de lava por vários segundos.
+- **Prioridade do trabalho novo**: com a fila cheia, despeja-se a entrada **mais distante no futuro**, nunca a que acabou de ser solicitada. Um balde despejado pelo jogador sempre flui, mesmo no meio de um mundo minerado.
+- **Identidade da célula manda no agendamento**: a deduplicação é por coordenada, mas um tique pendente pertence ao fluído que *estava* lá. Se a célula trocou de fluído (água drenou, lava foi despejada por cima), o tempo pendente é **descartado e recalculado** com o atraso do fluído novo, e não herdado. Sem isso a lava nova herdava o tique de $0.25\,\text{s}$ da água e se espalhava seis vezes mais rápido do que deveria.
+- **Auto-cura de tiques**: se um tique é invalidado porque a célula trocou de identidade, ele é reagendado para o fluído atual em vez de ser descartado. Nenhuma célula pode ficar presa para sempre sem tique.
+- **Consumo antes do tique**: a entrada é removida da fila *antes* de ser executada, para que um reagendamento feito durante o próprio tique sobreviva em vez de ser apagado pela limpeza do final do frame.
+- **Alcance lateral**: $7$ blocos, com suporte vertical quando dois níveis iguais se encostam (a coluna fica suspensa como no vanilla).
+- **Cantos**: fluxo descendente preenche diagonais para não deixar frestas.
+- **Retração**: um bloco que perdeu o apoio e não tem saída agenda sua própria remoção (nível $n+1$ até virar ar).
+- **Reação água/lava**: Lava de **fonte** $\rightarrow$ **Obsidiana**; Lava de **fluxo** $\rightarrow$ **Pedregulho**. Ambas consomem a célula de lava.
+- **Substituição**: apenas ar e blocos não sólidos e transparentes (plantas, tochas, fios, portas) são substituíveis por fluído.
+
+#### Despertar de Fluídos Inertes (Oceanos)
+```
+Bloco adjacente vira AIR  ──→  fluido estático vizinho vira FONTE (nível 0)  ──→  agenda tique
+```
+Cavar um buraco no mar, portanto, cria um vazamento real e localizado, sem inundar o mapa inteiro.
+
+#### Baldes (Itens `WATER` / `LAVA` / `EMPTY_BUCKET`)
+| Item | ID | Ação com o Botão Direito |
+| :--- | :--- | :--- |
+| **Balde de Água** (`WATER`) | $10$ | Verte uma **fonte de água** via `spawnFluidSource()` + respingo e som |
+| **Balde de Lava** (`LAVA`) | $26$ | Verte uma **fonte de lava** (perigosa: queima) |
+| **Balde Vazio** (`EMPTY_BUCKET`) | $147$ | **Enche** no fluído alvejado, removendo a célula e devolvendo o balde cheio |
+
+- O `raycastVoxel()` agora aceita `{ includeFluids: true }` e devolve `fluidHit` (a primeira célula de água/lava atravessada) **separadamente** de `hit` (o bloco sólido). Assim o fluído pode ser alvo do balde sem nunca bloquear a mineração do bloco atrás dele.
+- Baldes **não empilham** (`getMaxStack() === 1`) e possuem ícone 16×16 dedicado e modelo 3D próprio (`createBucketMesh()`).
+- Receita: 3 Barras de Ferro em uma fileira (Bancada 3×3).
+
+#### Física do Jogador em Fluídos
+| Parâmetro | Valor |
+| :--- | :--- |
+| Gravidade na água | $0.3\times$ ($8.4$) |
+| Gravidade na lava | $0.18\times$ ($5.04$) — a lava é um piche pesada |
+| Velocidade de natação | $3.6\,\text{m/s}$ ($60\%$ disso na lava) |
+| Empuxo da corrente | Até $3.4\,\text{m/s}$, proporcional ao desnível de nível entre a célula do corpo e a vizinha mais fraca |
+| Dano contínuo na lava | $4.0$ pontos/s ($2$ corações/s), imune a regeneração |
+| Dano de afogamento | $2.0$ pontos/s após $6.0\,\text{s}$ com os olhos submersos |
+| Dano de queda | Anulado dentro de qualquer fluído (o impacto é absorvido) |
+| Névoa submersa | `near` $35 \rightarrow 0.6$, `far` $65 \rightarrow 14$, cor $\rightarrow$ azul profundo em ~$125\text{ms}$ |
+
+`dayNightCycle.js` expõe `setUnderwaterMode()` para que a paleta do céu **não dispute** com a névoa azul enquanto o jogador está submerso.
+
+#### Fluídos e Mobs
+- **Lava**: $4$ pontos de dano a cada $0.5\,\text{s}$ com partículas de brasa; qualquer tipo de mob.
+- **Água**: Empuxo ascendente ($+34\,\text{m/s}^2$) com amortecimento, puxando o mob até a linha d'água; a velocidade vertical é limitada a $-3.5\,\text{m/s}$.
+
+---
+
 ### ⚡ 1. Motor de Redstone (`redstoneEngine.js`)
 * **Propagação BFS (Breadth-First Search)**: O sinal de redstone decai $1$ nível a cada bloco percorrido (de $15$ até $0$).
 * **Fontes de Energia**: Alavancas ligadas ($15$), Placas de Pressão acionadas ($15$) e Tochas de Redstone ($15$).
@@ -198,6 +278,7 @@ $$\text{Redução Percentual} = \text{Pontos de Defesa} \times 4\% \quad (\text{
 ### ⛏️ 5. Sistema Avançado de Mineração & Quebra Progressiva
 - **Animação Dinâmica de Rachaduras (*Block Breaking Cracks*)**: Implementadas 6 etapas autênticas de fratura procedural (`destroy_stage_0` a `destroy_stage_5`) mapeadas diretamente pelo atlas no cubo de sobreposição.
 - **Golpes Rítmicos Contínuos na 1ª Pessoa**: O braço do jogador realiza ciclos de mineração automáticos e fluidos enquanto o botão esquerdo do mouse permanece pressionado.
+- **Fluídos Não Mineráveis**: Água e Lava são capturados pelo raycast de fluído e ignorados pela quebra progressiva — só se usa um **Balde** para removê-los.
 - **Acoustic Profiling (*soundFx.js*)**: Sons de impacto e quebra agora diferenciam ressonâncias acústicas para Madeira, Terra/Pedregulho, Minérios Preciosos (som cristalino/snap) e Obsidiana (grave pesado).
 - **Taxas de Partículas Otimizadas**: Efeitos de poeira e detritos com buffer de materiais em cache e limite de partículas ativas para evitar quedas de framerate.
 
@@ -208,6 +289,22 @@ $$\text{Redução Percentual} = \text{Pontos de Defesa} \times 4\% \quad (\text{
 1. **BufferGeometry com `Uint16Array` Indexing**: Geometrias de chunks utilizam arrays de índices de 16 bits quando a contagem de vértices é baixa, economizando banda de memória VRAM e acelerando chamadas de draw.
 2. **Pool e Cache de Materiais em Partículas (`particles.js`)**: Evita criação/descarte contínuo de materiais WebGL no coletor de lixo (*Garbage Collector*).
 3. **Flags WebGL de Alto Desempenho**: Renderizador configurado com `powerPreference: 'high-performance'` e `stencil: false`.
+4. **Remesh Diferido de Fluídos (`worldManager.js`)**: `setMeshDeferral(true)` acumula todos os chunks sujos de um frame em um único `Set`; `flushDirtyChunks()` reconstrói no máximo **2 chunks por frame**. Sem isso, um único balde de lava derrubaria o framerate ao remakejar dezenas de chunks no mesmo tick.
+5. **Culling de Fluído entre Chunks (`chunk.js`)**: A malha de fluído consulta `getFluidLevelAtWorld()` dos vizinhos e só emite faces expostas, então a superfície de um oceano é mesclada em vez de duplicada na fronteira do chunk.
+6. **Materiais de Fluído Reutilizados**: `sharedMaterial`, `waterMaterial` e `lavaMaterial` são instâncias de módulo (uma de cada tipo), compartilhadas por **todos** os chunks; só a geometria é recriada a cada remesh.
+7. **Orçamento de Tiques Dedicado**: A fila de fluídos é limitada a **6000** entradas e consome **96 tiques por frame**, garantindo que a simulação nunca roube o orçamento do renderizador. A varredura da fila (**1536/frame**) é separada do orçamento de tiques, e entradas sem efeito são descartadas de graça, de modo que nenhuma rajada de mudanças de blocos consiga atrasar trabalho lento (a lava) nem uma fonte recém-despejada.
+8. **Cooldown de Áudio de Fluído**: Sons de corrente e chiado têm cooldown global e teste de distância ao ouvinte, evitando dezenas de osciladores por segundo.
+9. **Áudio Reutilizável**: `updateCavernAmbience()` reaproveita o mesmo par de osciladores e aplica a resposta de caverna por **filtro passa-baixa**, sem criar nós de áudio novos por frame.
+
+### Custo Medido (Teste de Integração Headless, `dt = 0.05s`)
+
+| Cenário | Custo por frame |
+|---|---|
+| Motor ocioso (fila vazia) | **0.0001 ms** |
+| Fluxo de água ativo (113 células) | **~0.82 ms** |
+| Inundação patológica de lava (pico de **5255** tiques pendentes) | **~5.30 ms** |
+
+> Mesmo no pior caso testado, o motor de fluídos fica com menos de um terço do orçamento de $16.7\,\text{ms}$ de um frame a 60 FPS. A fila também nunca escapou do teto de 6000 entradas.
 
 ---
 
@@ -215,6 +312,7 @@ $$\text{Redução Percentual} = \text{Pontos de Defesa} \times 4\% \quad (\text{
 
 1. **Biomas e Clima Expansivo**: Neve acumulada em biomas glaciais, tempestades e trovões volumétricos.
 2. **Dimensão do Fim (The End) & Boss Dragon**: Acesso via portal do fim para a batalha final da versão 1.0.
-3. **Fluidos Dinâmicos**: Física de fluxo contínuo de água e lava com geração de pedregulho/obsidiana no contato.
-4. **Sons Ambiente Subterrâneos**: Ecos e gotas de água em cavernas profundas.
+3. **Persistência de Fluidos no Save**: Serializar o array `chunk.fluid` para que rios e baldes continuem onde foram deixados.
+4. **Bombeamento & Irrigação**: Baldes cheios viram itens depositáveis e a água das fazendas passa a ser simulada.
+5. **Peixes e Vida Aquática**: Mobs que só se movem em água, usando a flutuação já implementada em `mobManager.js`.
 

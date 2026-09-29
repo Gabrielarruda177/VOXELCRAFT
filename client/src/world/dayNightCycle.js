@@ -21,6 +21,18 @@ let dirLight = null;
 let hemiLight = null;
 let ambientLight = null;
 
+// Submerged override: the day/night palette must not fight the underwater tint.
+const UNDERWATER_FOG_COLOR = new THREE.Color(0x14406f);
+let underwaterMode = false;
+
+/**
+ * Flag set by the player controller. While true the sky/fog palette is
+ * suppressed so the dense blue underwater atmosphere stays put.
+ */
+export function setUnderwaterMode(active) {
+  underwaterMode = active;
+}
+
 // Sky color palettes for key cycle times
 const SKY_COLORS = {
   dawn:     new THREE.Color(0xf59e0b), // 0.00 - Sunrise (06:00)
@@ -148,7 +160,11 @@ function updateAtmosphere(dt, scene, renderer) {
 
   if (scene) {
     if (scene.fog) {
-      scene.fog.color.copy(tempFogColor);
+      if (underwaterMode) {
+        scene.fog.color.copy(UNDERWATER_FOG_COLOR);
+      } else {
+        scene.fog.color.copy(tempFogColor);
+      }
     }
   }
 

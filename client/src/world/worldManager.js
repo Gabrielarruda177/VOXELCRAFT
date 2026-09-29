@@ -12,11 +12,19 @@
 
 import * as THREE from 'three';
 import { Chunk, CHUNK_WIDTH, CHUNK_HEIGHT } from './chunk.js';
-import { BlockType, isSolid as isSolidBlock } from './blockTypes.js';
+import {
+  BlockType,
+  isSolid as isSolidBlock,
+  isFluid,
+  isFluidReplaceable,
+  FLUID_STATIC,
+  FLUID_SOURCE_LEVEL,
+} from './blockTypes.js';
 
 const chunks = new Map();
 const chunkMeshes = new Map();
 const chunkWaterMeshes = new Map();
+const chunkLavaMeshes = new Map();
 
 export const SEA_LEVEL = 18;
 const RENDER_RADIUS = 3;  // Optimized active chunk radius (7×7 = 49 chunks instead of 121 for huge FPS boost)
@@ -26,6 +34,52 @@ let currentScene = null;
 let lastPlayerChunkX = NaN;
 let lastPlayerChunkZ = NaN;
 const pendingBuildQueue = [];
+
+// ── Fluid bookkeeping (see fluidEngine.js) ─────────────────
+const dirtyChunks = new Set();
+let meshDeferral = false;
+let fluidChangeListener = null;
+
+/**
+ * Register a callback fired on every world block mutation so the fluid engine
+ * can schedule ticks. Avoids a circular import between world & fluid modules.
+ * @param {Function|null} fn - (wx, wy, wz, newType, prevType, prevLevel) => void
+ */
+export function setFluidChangeListener(fn) {
+  fluidChangeListener = fn;
+}
+
+/** When true, block writes only mark chunks dirty instead of remeshing. */
+export function setMeshDeferral(enabled) {
+  meshDeferral = enabled;
+}
+
+/**
+ * Remesh up to `budget` chunks that were written while deferral was active.
+ * @returns {number} how many chunks were rebuilt
+ */
+export function flushDirtyChunks(scene, budget = 2) {
+  if (dirtyChunks.size === 0) return 0;
+
+  const target = currentScene || scene;
+  if (!target) { dirtyChunks.clear(); return 0; }
+
+  let rebuilt = 0;
+  for (const key of Array.from(dirtyChunks)) {
+    if (rebuilt >= budget) break;
+    dirtyChunks.delete(key);
+    const chunk = chunks.get(key);
+    if (chunk) {
+      buildChunkMesh(chunk, target);
+      rebuilt++;
+    }
+  }
+  return rebuilt;
+}
+
+export function getPendingMeshCount() {
+  return dirtyChunks.size + pendingBuildQueue.length;
+}
 
 // ── Deterministic Noise Functions ─────────────────────────
 
@@ -319,9 +373,9 @@ function generateNetherChunk(cx, cz) {
             chunk.setBlock(x, y, z, BlockType.NETHERRACK);
           }
         } else {
-          // Open air or molten lava seas
+          // Open air or molten lava seas (inert: world-generated fluids never flow)
           if (y <= 16) {
-            chunk.setBlock(x, y, z, BlockType.LAVA);
+            chunk.setBlockWithFluid(x, y, z, BlockType.LAVA, FLUID_STATIC);
           } else {
             chunk.setBlock(x, y, z, BlockType.AIR);
           }
@@ -388,13 +442,13 @@ function generateChunk(cx, cz) {
           }
         }
 
-        chunk.setBlock(x, y, z, block);
+        chunk.setBlockWithFluid(x, y, z, block, isFluid(block) ? FLUID_STATIC : FLUID_SOURCE_LEVEL);
       }
 
       // Water body filling up to sea level
       for (let y = height + 1; y <= SEA_LEVEL; y++) {
         if (chunk.getBlock(x, y, z) === BlockType.AIR) {
-          chunk.setBlock(x, y, z, BlockType.WATER);
+          chunk.setBlockWithFluid(x, y, z, BlockType.WATER, FLUID_STATIC);
         }
       }
     }
@@ -548,22 +602,81 @@ export function isWorldBlockSolid(wx, wy, wz) {
   return isSolidBlock(getBlockAtWorld(wx, wy, wz));
 }
 
+// ── Fluid Level Access ─────────────────────────────────────
+
+function getLoadedChunk(wx, wz) {
+  const cx = Math.floor(wx / CHUNK_WIDTH);
+  const cz = Math.floor(wz / CHUNK_WIDTH);
+  return chunks.get(`${cx},0,${cz}`);
+}
+
+/**
+ * True when the chunk containing (wx, wz) is currently resident in memory.
+ * The fluid engine skips ticks outside the resident window to stay bounded.
+ */
+export function isChunkLoaded(wx, wz) {
+  return getLoadedChunk(wx, wz) !== undefined;
+}
+
+/**
+ * Read the fluid level stored at a world coordinate.
+ * Unloaded chunks fall back to the procedural world-generation guess so border
+ * meshing never produces a zero-height sea wall.
+ * @returns {number} 0 = source, 1..7 = flowing, FLUID_STATIC = inert
+ */
+export function getFluidLevelAtWorld(wx, wy, wz) {
+  if (wy < 0 || wy >= CHUNK_HEIGHT) return FLUID_SOURCE_LEVEL;
+
+  const cx = Math.floor(wx / CHUNK_WIDTH);
+  const cz = Math.floor(wz / CHUNK_WIDTH);
+  const chunk = chunks.get(`${cx},0,${cz}`);
+
+  if (chunk) {
+    const lx = ((wx % CHUNK_WIDTH) + CHUNK_WIDTH) % CHUNK_WIDTH;
+    const lz = ((wz % CHUNK_WIDTH) + CHUNK_WIDTH) % CHUNK_WIDTH;
+    return chunk.getFluidLevel(lx, wy, lz);
+  }
+
+  // Procedural fallback — mirror the guessed block type.
+  const type = getBlockAtWorld(wx, wy, wz);
+  return isFluid(type) ? FLUID_STATIC : FLUID_SOURCE_LEVEL;
+}
+
+/**
+ * Type of fluid at a coordinate, or AIR when there is none.
+ */
+export function getFluidTypeAtWorld(wx, wy, wz) {
+  const type = getBlockAtWorld(wx, wy, wz);
+  return isFluid(type) ? type : BlockType.AIR;
+}
+
 function buildChunkMesh(chunk, scene) {
   const key = `${chunk.cx},0,${chunk.cz}`;
 
   // Dispose old mesh if present
   const oldSolid = chunkMeshes.get(key);
   const oldWater = chunkWaterMeshes.get(key);
+  const oldLava = chunkLavaMeshes.get(key);
   if (oldSolid) { scene.remove(oldSolid); oldSolid.geometry.dispose(); }
   if (oldWater) { scene.remove(oldWater); oldWater.geometry.dispose(); }
+  if (oldLava) { scene.remove(oldLava); oldLava.geometry.dispose(); }
+  // Drop the stale entries even when the rebuild produces no fluid mesh,
+  // otherwise unloading would dispose an already-disposed geometry again.
+  chunkWaterMeshes.delete(key);
+  chunkLavaMeshes.delete(key);
 
-  const { solidMesh, waterMesh } = chunk.buildMesh(getBlockAtWorld);
+  const { solidMesh, waterMesh, lavaMesh } = chunk.buildMesh(getBlockAtWorld, getFluidLevelAtWorld);
   chunkMeshes.set(key, solidMesh);
   scene.add(solidMesh);
 
   if (waterMesh) {
     chunkWaterMeshes.set(key, waterMesh);
     scene.add(waterMesh);
+  }
+
+  if (lavaMesh) {
+    chunkLavaMeshes.set(key, lavaMesh);
+    scene.add(lavaMesh);
   }
 }
 
@@ -612,10 +725,13 @@ export function updateWorld(playerPos, scene) {
       if (dist > UNLOAD_RADIUS) {
         const solidMesh = chunkMeshes.get(key);
         const waterMesh = chunkWaterMeshes.get(key);
+        const lavaMesh = chunkLavaMeshes.get(key);
         if (solidMesh) { scene.remove(solidMesh); solidMesh.geometry.dispose(); chunkMeshes.delete(key); }
         if (waterMesh) { scene.remove(waterMesh); waterMesh.geometry.dispose(); chunkWaterMeshes.delete(key); }
+        if (lavaMesh) { scene.remove(lavaMesh); lavaMesh.geometry.dispose(); chunkLavaMeshes.delete(key); }
         chunk.dispose();
         chunks.delete(key);
+        dirtyChunks.delete(key);
       }
     }
 
@@ -668,14 +784,18 @@ export function switchDimension(scene, targetDim) {
   for (const [key, chunk] of chunks.entries()) {
     const solidMesh = chunkMeshes.get(key);
     const waterMesh = chunkWaterMeshes.get(key);
+    const lavaMesh = chunkLavaMeshes.get(key);
     if (solidMesh) { scene.remove(solidMesh); solidMesh.geometry.dispose(); }
     if (waterMesh) { scene.remove(waterMesh); waterMesh.geometry.dispose(); }
+    if (lavaMesh) { scene.remove(lavaMesh); lavaMesh.geometry.dispose(); }
     chunk.dispose();
   }
   chunks.clear();
   chunkMeshes.clear();
   chunkWaterMeshes.clear();
+  chunkLavaMeshes.clear();
   pendingBuildQueue.length = 0;
+  dirtyChunks.clear();
   lastPlayerChunkX = NaN;
   lastPlayerChunkZ = NaN;
 
@@ -698,34 +818,21 @@ export function switchDimension(scene, targetDim) {
   }
 }
 
-export function setBlockAtWorld(scene, wx, wy, wz, type) {
+/**
+ * Write a block into the world, keeping fluid metadata consistent.
+ *
+ * The water/lava → obsidian reaction now lives in fluidEngine.js so it also
+ * runs for naturally spreading fluids, not only for player placement.
+ *
+ * @param {THREE.Scene} scene
+ * @param {number} wx
+ * @param {number} wy
+ * @param {number} wz
+ * @param {number} type
+ * @param {number} [fluidLevel=0] 0 = source, 1..7 = flowing, FLUID_STATIC = inert
+ */
+export function setBlockAtWorld(scene, wx, wy, wz, type, fluidLevel = FLUID_SOURCE_LEVEL) {
   if (wy < 0 || wy >= CHUNK_HEIGHT) return;
-
-  // Water + Lava reaction -> Obsidian!
-  if (type === BlockType.WATER) {
-    const neighbors = [
-      [wx + 1, wy, wz], [wx - 1, wy, wz],
-      [wx, wy + 1, wz], [wx, wy - 1, wz],
-      [wx, wy, wz + 1], [wx, wy, wz - 1],
-    ];
-    for (const [nx, ny, nz] of neighbors) {
-      if (getBlockAtWorld(nx, ny, nz) === BlockType.LAVA) {
-        setBlockAtWorld(scene, nx, ny, nz, BlockType.OBSIDIAN);
-      }
-    }
-  } else if (type === BlockType.LAVA) {
-    const neighbors = [
-      [wx + 1, wy, wz], [wx - 1, wy, wz],
-      [wx, wy + 1, wz], [wx, wy - 1, wz],
-      [wx, wy, wz + 1], [wx, wy, wz - 1],
-    ];
-    for (const [nx, ny, nz] of neighbors) {
-      if (getBlockAtWorld(nx, ny, nz) === BlockType.WATER) {
-        type = BlockType.OBSIDIAN;
-        break;
-      }
-    }
-  }
 
   const cx = Math.floor(wx / CHUNK_WIDTH);
   const cz = Math.floor(wz / CHUNK_WIDTH);
@@ -735,18 +842,37 @@ export function setBlockAtWorld(scene, wx, wy, wz, type) {
 
   const lx = ((wx % CHUNK_WIDTH) + CHUNK_WIDTH) % CHUNK_WIDTH;
   const lz = ((wz % CHUNK_WIDTH) + CHUNK_WIDTH) % CHUNK_WIDTH;
-  chunk.setBlock(lx, wy, lz, type);
 
-  buildChunkMesh(chunk, scene);
+  const prevType = chunk.getBlock(lx, wy, lz);
+  const prevLevel = chunk.getFluidLevel(lx, wy, lz);
+
+  if (prevType === type && !isFluid(type)) return;
+
+  const level = isFluid(type) ? fluidLevel : FLUID_SOURCE_LEVEL;
+  chunk.setBlockWithFluid(lx, wy, lz, type, level);
+
+  markChunkDirty(scene, cx, cz);
 
   // Border neighbor chunk updates
-  if (lx === 0)                  updateNeighborChunk(scene, cx - 1, cz);
-  if (lx === CHUNK_WIDTH - 1)    updateNeighborChunk(scene, cx + 1, cz);
-  if (lz === 0)                  updateNeighborChunk(scene, cx, cz - 1);
-  if (lz === CHUNK_WIDTH - 1)    updateNeighborChunk(scene, cx, cz + 1);
+  if (lx === 0)                  markChunkDirty(scene, cx - 1, cz);
+  if (lx === CHUNK_WIDTH - 1)    markChunkDirty(scene, cx + 1, cz);
+  if (lz === 0)                  markChunkDirty(scene, cx, cz - 1);
+  if (lz === CHUNK_WIDTH - 1)    markChunkDirty(scene, cx, cz + 1);
+
+  if (fluidChangeListener) {
+    fluidChangeListener(wx, wy, wz, type, prevType, prevLevel);
+  }
 }
 
-function updateNeighborChunk(scene, cx, cz) {
-  const chunk = chunks.get(`${cx},0,${cz}`);
-  if (chunk) buildChunkMesh(chunk, scene);
+/**
+ * Remesh now, or queue the chunk for a batched rebuild when deferral is on.
+ */
+function markChunkDirty(scene, cx, cz) {
+  const key = `${cx},0,${cz}`;
+  if (meshDeferral) {
+    dirtyChunks.add(key);
+    return;
+  }
+  const chunk = chunks.get(key);
+  if (chunk) buildChunkMesh(chunk, scene || currentScene);
 }

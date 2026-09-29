@@ -1,0 +1,17 @@
+# Credenciais do servidor — nunca versionar.
+server/.env
+.env
+.env.local
+.env.*.local
+
+# Dependências
+node_modules/
+
+# Saída de build
+dist/
+
+# Logs e temporários
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db

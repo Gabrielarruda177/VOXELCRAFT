@@ -557,6 +557,171 @@ export function playLavaSizzleSound() {
   noise.start(now);
 }
 
+/**
+ * Short bubbling water flow — filtered noise with a downward pitch sweep,
+ * used by the fluid engine while a stream advances.
+ */
+export function playWaterFlowSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  const duration = 0.32;
+  const bufferSize = Math.floor(ctx.sampleRate * duration);
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+
+  for (let i = 0; i < bufferSize; i++) {
+    const t = i / bufferSize;
+    data[i] = (Math.random() * 2 - 1) * (1 - t) * (1 - t);
+  }
+
+  const noise = ctx.createBufferSource();
+  noise.buffer = buffer;
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.Q.setValueAtTime(1.6, now);
+  filter.frequency.setValueAtTime(900, now);
+  filter.frequency.exponentialRampToValueAtTime(380, now + duration);
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.10, now);
+  gain.gain.exponentialRampToValueAtTime(0.005, now + duration);
+
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+
+  noise.start(now);
+}
+
+/**
+ * Splash / plunge — broadband noise burst plus a low "gloop" sine tail.
+ */
+export function playSplashSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  const duration = 0.45;
+  const bufferSize = Math.floor(ctx.sampleRate * duration);
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+
+  for (let i = 0; i < bufferSize; i++) {
+    const t = i / bufferSize;
+    data[i] = (Math.random() * 2 - 1) * Math.exp(-t * 3.2);
+  }
+
+  const noise = ctx.createBufferSource();
+  noise.buffer = buffer;
+
+  const highpass = ctx.createBiquadFilter();
+  highpass.type = 'highpass';
+  highpass.frequency.setValueAtTime(600, now);
+
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.setValueAtTime(0.18, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.004, now + duration);
+
+  noise.connect(highpass);
+  highpass.connect(noiseGain);
+  noiseGain.connect(ctx.destination);
+
+  // Low "gloop" bubble underneath the noise
+  const gloop = ctx.createOscillator();
+  gloop.type = 'sine';
+  gloop.frequency.setValueAtTime(520, now);
+  gloop.frequency.exponentialRampToValueAtTime(150, now + 0.22);
+
+  const gloopGain = ctx.createGain();
+  gloopGain.gain.setValueAtTime(0.12, now);
+  gloopGain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+
+  gloop.connect(gloopGain);
+  gloopGain.connect(ctx.destination);
+
+  noise.start(now);
+  gloop.start(now);
+  gloop.stop(now + 0.26);
+}
+
+/**
+ * Wet hiss emitted when water quenches lava into obsidian / cobblestone.
+ */
+export function playFluidHissSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  const duration = 0.6;
+  const bufferSize = Math.floor(ctx.sampleRate * duration);
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+
+  for (let i = 0; i < bufferSize; i++) {
+    const t = i / bufferSize;
+    data[i] = (Math.random() * 2 - 1) * Math.exp(-t * 2.4);
+  }
+
+  const noise = ctx.createBufferSource();
+  noise.buffer = buffer;
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.Q.setValueAtTime(0.9, now);
+  filter.frequency.setValueAtTime(3200, now);
+  filter.frequency.exponentialRampToValueAtTime(700, now + duration);
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.12, now);
+  gain.gain.exponentialRampToValueAtTime(0.003, now + duration);
+
+  noise.connect(filter);
+  filter.connect(gain);
+  gain.connect(ctx.destination);
+
+  noise.start(now);
+}
+
+/**
+ * Deep cavern ambience: sparse water drips with long cave reverb tail.
+ * Driven by the player's depth through the audio listener position.
+ */
+export function playCaveDripSound() {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+
+  const now = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  const base = 900 + Math.random() * 700;
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(base, now);
+  osc.frequency.exponentialRampToValueAtTime(base * 0.45, now + 0.14);
+
+  // Cheap "cavern" tail: a short feedback-free delay line.
+  const delay = ctx.createDelay(0.5);
+  delay.delayTime.setValueAtTime(0.16, now);
+  const tailGain = ctx.createGain();
+  tailGain.gain.setValueAtTime(0.22, now);
+  tailGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+  gain.gain.setValueAtTime(0.09, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  gain.connect(delay);
+  delay.connect(tailGain);
+  tailGain.connect(ctx.destination);
+
+  osc.start(now);
+  osc.stop(now + 0.18);
+}
+
 export function playSleepSound() {
   const ctx = getAudioContext();
   if (!ctx) return;
@@ -788,6 +953,37 @@ function playAmbientPhrase() {
     osc.stop(timeOffset + duration);
 
     timeOffset += 0.8 + Math.random() * 0.6;
+  }
+}
+
+// ── Subterranean Ambience (item 4 dos próximos passos) ─────
+
+let caveTimer = 6.0;
+
+/**
+ * Sparse water drips that fade in as the player descends into darkness,
+ * making deep caves feel alive instead of silent.
+ *
+ * @param {number} dt
+ * @param {{x:number,y:number,z:number}} playerPos
+ * @param {number} [surfaceHeight=22] terrain height at the player column
+ */
+export function updateCavernAmbience(dt, playerPos, surfaceHeight = 22) {
+  if (!playerPos) return;
+
+  // How deep below the local surface the player is standing.
+  const depth = surfaceHeight - playerPos.y;
+  if (depth <= 6) {
+    caveTimer = 5.0;
+    return;
+  }
+
+  caveTimer -= dt;
+  if (caveTimer <= 0) {
+    // Drips get denser the deeper you go, but never machine-gun fast.
+    const density = Math.min(9, 2 + Math.floor(depth / 5));
+    caveTimer = 1.5 + Math.random() * (7 - Math.min(5, density));
+    playCaveDripSound();
   }
 }
 

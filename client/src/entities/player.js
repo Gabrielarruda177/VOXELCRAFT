@@ -13,10 +13,13 @@ import {
   CameraMode,
   updateCameraPosition,
 } from '../engine/camera.js';
-import { getBlockAtWorld, getSpawnPosition } from '../world/worldManager.js';
-import { BlockType, isSolid } from '../world/blockTypes.js';
+import { getBlockAtWorld, getSpawnPosition, getFluidLevelAtWorld as getFluidLevel, getCurrentDimension, Dimension } from '../world/worldManager.js';
+import { BlockType, isSolid, isFluid, getFluidHeight, FLUID_STATIC } from '../world/blockTypes.js';
+import { getScene } from '../rendering/sceneSetup.js';
+import { setUnderwaterMode } from '../world/dayNightCycle.js';
 import { isKeyDown } from '../engine/input.js';
-import { playJumpSound, playFlyToggleSound, playHurtSound, playStepSound, playCraftSound } from '../engine/soundFx.js';
+import { playJumpSound, playFlyToggleSound, playHurtSound, playStepSound, playCraftSound, playLavaSizzleSound } from '../engine/soundFx.js';
+import { spawnSplashAt } from '../engine/fluidEngine.js';
 import { showCameraModeToast } from '../ui/hud.js';
 import { updatePlayerModel } from './playerModel.js';
 import { getSelectedBlockType } from '../engine/interaction.js';
@@ -37,11 +40,20 @@ const SWIM_SPEED = 3.6;
 const ACCEL = 65;
 const FRICTION = 14;
 
+// Fluids
+const DROWN_TOLERANCE = 6.0;
+const DROWN_DPS = 2.0;
+const LAVA_DPS = 4.0;          // 2 hearts per second standing in lava
+const LAVA_SPLASH_COOLDOWN = 0.7;
+const FLOW_PUSH_STRENGTH = 3.4; // max horizontal push from a strong current
+const UNDERWATER_FOG_NEAR = 0.6;
+const UNDERWATER_FOG_FAR = 14.0;
+const SKY_FOG_NEAR = 35;
+const SKY_FOG_FAR = 65;
+
 let stepTimer = 0.0;
 
 const MAX_HEALTH = 20;
-const DROWN_TOLERANCE = 6.0;
-const DROWN_DPS = 2.0;
 const REGEN_DELAY = 5.0;
 const REGEN_RATE = 0.5;
 const SAFE_FALL_HEIGHT = 3.2; // Safe fall height in blocks (like Minecraft)
@@ -57,7 +69,13 @@ let onGround = false;
 let isFlying = false;
 let inWater = false;
 let submerged = false;
+let inLava = false;
 let underwaterTime = 0;
+let lavaTime = 0;
+let fluidSplashCooldown = 0;
+let flowPushX = 0;
+let flowPushZ = 0;
+let surfaceY = -999;   // world-space height of the fluid surface the player is in
 let moving = false;
 let damageFlash = 0;
 let regenTimer = 0;
@@ -130,7 +148,9 @@ export function getMaxHealth() { return MAX_HEALTH; }
 export function getDamageFlash() { return damageFlash; }
 export function isPlayerFlying() { return isFlying; }
 export function getPlayerPosition() { return pos; }
-export function getPlayerState() { return { onGround, moving, inWater, submerged, isFlying }; }
+export function isPlayerInLava() { return inLava; }
+export function isPlayerSubmerged() { return submerged; }
+export function getPlayerState() { return { onGround, moving, inWater, inLava, submerged, isFlying }; }
 
 export function damage(amount, knockbackDir = null) {
   if (health <= 0) return;
@@ -165,7 +185,14 @@ export function respawn() {
   onGround = false;
   isFlying = false;
   underwaterTime = 0;
+  lavaTime = 0;
   regenTimer = 0;
+  inWater = false;
+  inLava = false;
+  submerged = false;
+  surfaceY = -999;
+  flowPushX = 0;
+  flowPushZ = 0;
   const spawn = getSpawnPosition();
   pos.set(spawn.x, spawn.y, spawn.z);
   fallStartY = pos.y;
@@ -205,6 +232,128 @@ function waterAt(wx, wy, wz) {
   return getBlockAtWorld(wx, wy, wz) === BlockType.WATER;
 }
 
+// ── Fluid Sampling ─────────────────────────────────────────
+
+/**
+ * Read the fluid the player is standing in and compute its rendered surface
+ * height plus the direction of the current, so the body bobs at the waterline
+ * and gets pushed by strong flows.
+ */
+function sampleFluid(dt) {
+  const bx = Math.floor(pos.x);
+  const bz = Math.floor(pos.z);
+  const feetY = Math.floor(pos.y + 0.15);
+
+  let fluidType = BlockType.AIR;
+  let surface = -999;
+
+  for (let dy = 0; dy <= 1; dy++) {
+    const y = feetY + dy;
+    const type = getBlockAtWorld(bx, y, bz);
+    if (!isFluid(type)) continue;
+    fluidType = type;
+    surface = y + getFluidRenderHeight(bx, y, bz);
+    break;
+  }
+
+  inLava = fluidType === BlockType.LAVA;
+  const inAnyFluid = fluidType !== BlockType.AIR;
+
+  if (!inAnyFluid) {
+    inWater = false;
+    submerged = false;
+    surfaceY = -999;
+    flowPushX = 0;
+    flowPushZ = 0;
+    return;
+  }
+
+  inWater = fluidType === BlockType.WATER;
+  submerged = pos.y + EYE < surfaceY;
+  surfaceY = surface;
+
+  // The eye must be under a *full* water column to count as submerged.
+  if (inWater) {
+    submerged = waterAt(bx, Math.floor(pos.y + EYE), bz);
+  }
+
+  // Strong nearby flow shoves the player: compare the level of the cell the
+  // player occupies with its surroundings (lower level == stronger current).
+  if (inWater) {
+    const myLevel = getFluidStrength(bx, feetY, bz);
+    let bestDx = 0, bestDz = 0, bestDrop = 0;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (getBlockAtWorld(bx + dx, feetY, bz + dz) !== BlockType.WATER) continue;
+      const nLevel = getFluidStrength(bx + dx, feetY, bz + dz);
+      const drop = myLevel - nLevel;
+      if (drop > bestDrop) {
+        bestDrop = drop;
+        bestDx = dx;
+        bestDz = dz;
+      }
+    }
+
+    if (bestDrop > 0) {
+      // Normalise so a source (0) next to level 3 gives a firm but sane push.
+      const strength = Math.min(1, (bestDrop + 1) / 4) * FLOW_PUSH_STRENGTH;
+      flowPushX = bestDx * strength;
+      flowPushZ = bestDz * strength;
+    } else {
+      flowPushX *= Math.exp(-8 * dt);
+      flowPushZ *= Math.exp(-8 * dt);
+    }
+  } else {
+    flowPushX = 0;
+    flowPushZ = 0;
+  }
+}
+
+/**
+ * Rendered height of a fluid column: full height when the same fluid continues
+ * above, otherwise the thinnest-flow height from the level.
+ */
+function getFluidRenderHeight(wx, wy, wz) {
+  if (getBlockAtWorld(wx, wy + 1, wz) === getBlockAtWorld(wx, wy, wz)) return 1;
+  return getFluidHeight(getFluidLevel(wx, wy, wz));
+}
+
+/** Numeric flow strength: lower = stronger. Static seas read as sources. */
+function getFluidStrength(wx, wy, wz) {
+  const level = getFluidLevel(wx, wy, wz);
+  return level >= FLUID_STATIC ? 0 : level;
+}
+
+// ── Underwater Atmosphere ──────────────────────────────────
+
+let underwaterFogActive = false;
+
+/**
+ * Swap the scene fog for a dense, close blue fog while the camera is under
+ * water and blend it back out on the surface. Fog is a cheap, high-impact way
+ * to sell "you are submerged" without any extra draw calls.
+ */
+function updateUnderwaterFog(dt) {
+  const scene = getScene();
+  if (!scene || !scene.fog) return;
+
+  // The Nether has its own permanent atmosphere — never override it.
+  if (getCurrentDimension() === Dimension.NETHER) return;
+
+  const targetNear = submerged ? UNDERWATER_FOG_NEAR : SKY_FOG_NEAR;
+  const targetFar = submerged ? UNDERWATER_FOG_FAR : SKY_FOG_FAR;
+
+  const k = Math.min(1, dt * 8);
+  scene.fog.near += (targetNear - scene.fog.near) * k;
+  scene.fog.far += (targetFar - scene.fog.far) * k;
+
+  underwaterFogActive = submerged;
+  setUnderwaterMode(submerged);
+}
+
+export function isUnderwaterFogActive() {
+  return underwaterFogActive;
+}
+
 // ── Main Update ───────────────────────────────────────────
 
 export function updatePlayer(dt) {
@@ -214,9 +363,21 @@ export function updatePlayer(dt) {
   const locked = isPointerLocked();
 
   damageFlash = Math.max(0, damageFlash - dt * 2.0);
+  fluidSplashCooldown = Math.max(0, fluidSplashCooldown - dt);
 
-  inWater = waterAt(Math.floor(pos.x), Math.floor(pos.y + 0.2), Math.floor(pos.z));
-  submerged = waterAt(Math.floor(pos.x), Math.floor(pos.y + EYE), Math.floor(pos.z));
+  // Previous frame's fluid state, needed to detect an entry splash.
+  const wasInFluid = inWater || inLava;
+  const entrySpeed = -velocity.y;
+
+  sampleFluid(dt);
+
+  // Splash feedback when plunging into water or lava.
+  if (fluidSplashCooldown <= 0 && !wasInFluid && (inWater || inLava) && entrySpeed > 2.0) {
+    fluidSplashCooldown = LAVA_SPLASH_COOLDOWN;
+    spawnSplashAt(pos.x, surfaceY >= -999 ? surfaceY : pos.y, pos.z);
+  }
+
+  updateUnderwaterFog(dt);
 
   // Space key detection (Triple tap for flight)
   const spaceDown = locked && isKeyDown('Space');
@@ -279,6 +440,13 @@ export function updatePlayer(dt) {
 
   moving = (moveFwd !== 0 || moveSide !== 0);
 
+  // River current: a strong flow drags the body even when no key is held.
+  if ((flowPushX !== 0 || flowPushZ !== 0) && !isFlying) {
+    const k = 1 - Math.exp(-6 * dt);
+    velocity.x += (flowPushX - velocity.x) * k;
+    velocity.z += (flowPushZ - velocity.z) * k;
+  }
+
   if (isFlying) {
     isFalling = false;
     const targetSpeed = FLY_SPEED;
@@ -317,7 +485,7 @@ export function updatePlayer(dt) {
 
   } else {
     // Jump execution
-    const canJump = (onGround || coyoteTimer > 0) && !inWater;
+    const canJump = (onGround || coyoteTimer > 0) && !inWater && !inLava;
     if (jumpBufferTimer > 0 && canJump) {
       velocity.y = JUMP_VEL;
       onGround = false;
@@ -326,14 +494,16 @@ export function updatePlayer(dt) {
       fallStartY = pos.y;
       isFalling = false;
       playJumpSound();
-    } else if (inWater && spaceDown) {
+    } else if ((inWater || inLava) && spaceDown) {
       velocity.y = Math.max(velocity.y, 4.5);
       isFalling = false;
     }
 
-    const gravity = inWater ? GRAVITY * 0.3 : GRAVITY;
+    // Lava is thick and heavy: it slows the fall and the swim.
+    const inFluid = inWater || inLava;
+    const gravity = inLava ? GRAVITY * 0.18 : inWater ? GRAVITY * 0.3 : GRAVITY;
     velocity.y -= gravity * dt;
-    const maxFall = inWater ? 8 : 36;
+    const maxFall = inFluid ? 8 : 36;
     if (velocity.y < -maxFall) velocity.y = -maxFall;
 
     // Track peak falling height
@@ -347,14 +517,14 @@ export function updatePlayer(dt) {
       fallStartY = pos.y;
     }
 
-    const speed = (submerged ? 0.7 : 1) * (inWater ? SWIM_SPEED : MOVE_SPEED);
+    const speed = (submerged ? 0.7 : 1) * (inFluid ? SWIM_SPEED * (inLava ? 0.6 : 1) : MOVE_SPEED);
     if (moving) {
       const k = 1 - Math.exp(-ACCEL * dt);
       velocity.x += (tx * speed - velocity.x) * k;
       velocity.z += (tz * speed - velocity.z) * k;
 
       const horizSpeed = Math.hypot(velocity.x, velocity.z);
-      if (onGround && !inWater && horizSpeed > 1.2 && !isFlying) {
+      if (onGround && !inFluid && horizSpeed > 1.2 && !isFlying) {
         stepTimer += dt;
         if (stepTimer >= 0.42) {
           stepTimer = 0.0;
@@ -412,8 +582,9 @@ export function updatePlayer(dt) {
         pos.y = landingY;
         velocity.y = 0;
 
-        // Minecraft Fall damage calculation (safe up to 3 blocks)
-        if (!inWater && fallDistance > SAFE_FALL_HEIGHT) {
+        // Minecraft Fall damage calculation (safe up to 3 blocks).
+        // Water (and lava) break the fall — never take fall damage in fluid.
+        if (!inWater && !inLava && fallDistance > SAFE_FALL_HEIGHT) {
           const fallDmg = Math.floor((fallDistance - SAFE_FALL_HEIGHT) * 1.5);
           if (fallDmg > 0) {
             damage(fallDmg);
@@ -453,11 +624,22 @@ export function updatePlayer(dt) {
     underwaterTime = Math.max(0, underwaterTime - dt * 2.5);
   }
 
-  if (health > 0 && health < MAX_HEALTH && !submerged) {
+  // Lava burns continuously: 2 hearts per second, no matter the armour.
+  if (inLava) {
+    if (lavaTime <= 0) playLavaSizzleSound();
+    lavaTime += dt;
+    damage(LAVA_DPS * dt);
+  } else {
+    lavaTime = 0;
+  }
+
+  if (health > 0 && health < MAX_HEALTH && !submerged && !inLava) {
     regenTimer += dt;
     if (regenTimer > REGEN_DELAY) {
       health = Math.min(MAX_HEALTH, health + REGEN_RATE * dt);
     }
+  } else {
+    regenTimer = 0;
   }
 
   if (health <= 0) {

@@ -9,7 +9,7 @@ import { createCamera, initPointerLock, getCamera } from './engine/camera.js';
 import { start as startLoop } from './engine/loop.js';
 import { createRenderer, createScene, render, getCanvas, setupCameraResize, getLights } from './rendering/sceneSetup.js';
 import { buildAtlas } from './rendering/textures/textureAtlas.js';
-import { generateWorld, updateWorld, getSpawnPosition } from './world/worldManager.js';
+import { generateWorld, updateWorld, getSpawnPosition, getCurrentDimension, getHeight } from './world/worldManager.js';
 import { update as updateHud } from './ui/hud.js';
 import { initHotbar, updateHotbar } from './ui/hotbar.js';
 import { initInventory } from './ui/inventory.js';
@@ -30,8 +30,10 @@ import { initDropManager, updateDrops } from './entities/dropManager.js';
 import { initCraftingTable } from './ui/crafting.js';
 import { updateFurnaces } from './ui/furnace.js';
 import { initWeather, updateWeather } from './world/weather.js';
+import { initFluidEngine, updateFluidEngine, resetFluidEngine } from './engine/fluidEngine.js';
+import { updateFluidShaderTime } from './world/chunk.js';
 import { saveWorld, loadWorld } from './engine/saveManager.js';
-import { updateAmbientMusic } from './engine/soundFx.js';
+import { updateAmbientMusic, updateCavernAmbience } from './engine/soundFx.js';
 
 // ── Bootstrap ──────────────────────────────────────────────
 
@@ -58,6 +60,9 @@ initWeather(scene);
 // 6. Particles & Drops
 initParticles(scene);
 initDropManager(scene);
+
+// 6b. Fluid simulation (Água & Lava com física de fluxo contínuo)
+initFluidEngine(scene);
 
 // 7. World (generates initial biomes and 3D caves)
 console.log('[VoxelCraft] Generating world biomes & 3D caves...');
@@ -105,11 +110,16 @@ console.log(`[VoxelCraft v0.6.0] Ready! Spawn at (${spawn.x}, ${spawn.y}, ${spaw
 // ── Game Loop ──────────────────────────────────────────────
 
 let autoSaveTimer = 0;
+let lastDimension = getCurrentDimension();
+let elapsedTime = 0;
 
 function update(dt, time) {
+  elapsedTime = time;
+
   if (isTitleScreenActive()) {
     updateWorld(camera.position, scene);
     updateDayNightCycle(dt, scene, camera, renderer);
+    updateFluidShaderTime(elapsedTime);
     return;
   }
 
@@ -117,11 +127,19 @@ function update(dt, time) {
     return;
   }
 
+  // Dimension change invalidates every pending fluid tick.
+  const dim = getCurrentDimension();
+  if (dim !== lastDimension) {
+    lastDimension = dim;
+    resetFluidEngine();
+  }
+
   // Active Gameplay Update
   updatePlayer(dt);
   updateWorld(camera.position, scene);
   updateDayNightCycle(dt, scene, camera, renderer);
   updateWeather(dt, getPlayerPosition());
+  updateFluidEngine(dt, getPlayerPosition());
   updateDynamicLighting(dt, time, getPlayerPosition(), getSelectedBlockType(), camera.position);
   updateRedstoneEngine(dt);
   updateFurnaces(dt);
@@ -133,7 +151,9 @@ function update(dt, time) {
   updateHealthHud();
   updateHand(dt, time);
   updateAmbientMusic(dt);
+  updateCavernAmbience(dt, getPlayerPosition(), getHeight(Math.floor(camera.position.x), Math.floor(camera.position.z)));
   updateHud(dt, { position: camera.position });
+  updateFluidShaderTime(elapsedTime);
 
   // Auto-save every 30s
   autoSaveTimer += dt;

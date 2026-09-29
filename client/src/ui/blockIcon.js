@@ -60,6 +60,46 @@ function makePixelIcon(size, draw16) {
 }
 
 /**
+ * Shared 16×16 bucket silhouette used by the empty, water and lava buckets.
+ * The body is always iron; the contents are drawn only when `fillTop` is given.
+ */
+function drawBucket(p, r, fillTop, fillBottom) {
+  const iron = '#cbd5e1';
+  const ironDark = '#64748b';
+  const ironOut = '#334155';
+  const ironHi = '#ffffff';
+
+  // Handle arch
+  p(4, 1, ironDark); p(5, 1, iron);
+  p(3, 2, iron); p(12, 2, iron);
+  p(3, 3, ironDark); p(12, 3, ironDark);
+
+  // Rim
+  r(3, 4, 10, 1, ironHi);
+  r(3, 5, 10, 1, iron);
+
+  if (fillTop) {
+    // Liquid surface plus a darker inner band for depth
+    r(4, 6, 8, 1, fillTop);
+    r(4, 7, 8, 3, fillBottom);
+    p(5, 6, '#ffffff');
+  } else {
+    // Empty bucket: show the inner shadow
+    r(4, 6, 8, 3, ironOut);
+    r(5, 6, 6, 1, '#475569');
+  }
+
+  // Body walls + base
+  r(3, 6, 1, 5, ironDark);
+  r(12, 6, 1, 5, ironDark);
+  r(4, 11, 8, 2, iron);
+  r(3, 13, 10, 1, ironDark);
+  r(4, 14, 8, 1, ironOut);
+  p(4, 7, ironHi);
+  p(4, 11, ironHi);
+}
+
+/**
  * Create a pixel-art icon for any block type or weapon.
  * @param {number} blockType
  * @param {number} size
@@ -567,19 +607,19 @@ export function createBlockIconCanvas(blockType, size = 46) {
 
   if (blockType === BlockType.WATER) {
     return makePixelIcon(size, (ctx, p, r) => {
-      // Iron Bucket filled with water
-      r(4, 5, 8, 7, '#94a3b8');
-      r(5, 5, 6, 3, '#38bdf8');
-      r(6, 6, 4, 2, '#0284c7');
+      drawBucket(p, r, '#38bdf8', '#0284c7');
     });
   }
 
   if (blockType === BlockType.LAVA) {
     return makePixelIcon(size, (ctx, p, r) => {
-      // Iron Bucket filled with lava
-      r(4, 5, 8, 7, '#94a3b8');
-      r(5, 5, 6, 3, '#f97316');
-      r(6, 6, 4, 2, '#facc15');
+      drawBucket(p, r, '#f97316', '#facc15');
+    });
+  }
+
+  if (blockType === BlockType.EMPTY_BUCKET) {
+    return makePixelIcon(size, (ctx, p, r) => {
+      drawBucket(p, r, null, null);
     });
   }
 

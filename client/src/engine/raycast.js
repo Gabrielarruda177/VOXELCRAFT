@@ -3,12 +3,14 @@
  *
  * Steps through voxels along a ray to find the first solid block hit,
  * plus the face normal and the previous (air) position for block placement.
+ * When `includeFluids` is set, the nearest water/lava cell met along the way is
+ * reported as `fluidHit` so buckets can scoop fluid without making fluids solid.
  */
 
 import * as THREE from 'three';
 import { getBlockAtWorld } from '../world/worldManager.js';
 import { CHUNK_HEIGHT } from '../world/chunk.js';
-import { isSolid } from '../world/blockTypes.js';
+import { isSolid, isFluid } from '../world/blockTypes.js';
 
 const MAX_REACH = 6;
 
@@ -16,9 +18,11 @@ const MAX_REACH = 6;
  * Cast a ray from origin in a direction through the voxel grid.
  * @param {THREE.Vector3} origin
  * @param {THREE.Vector3} direction
- * @returns {{ hit: {x:number,y:number,z:number}, normal: {x:number,y:number,z:number}, prev: {x:number,y:number,z:number} }|null}
+ * @param {{ includeFluids?: boolean }} [options]
+ * @returns {{ hit: {x:number,y:number,z:number}, normal: {x:number,y:number,z:number}, prev: {x:number,y:number,z:number}, fluidHit?: {x:number,y:number,z:number, type:number} }|null}
  */
-export function raycastVoxel(origin, direction) {
+export function raycastVoxel(origin, direction, options = {}) {
+  const includeFluids = options.includeFluids === true;
   const dir = direction.clone().normalize();
 
   let x = Math.floor(origin.x);
@@ -45,17 +49,23 @@ export function raycastVoxel(origin, direction) {
 
   let prevX = x, prevY = y, prevZ = z;
   let normalX = 0, normalY = 0, normalZ = 0;
+  let fluidHit = null;
 
   for (let i = 0; i < MAX_REACH * 3; i++) {
     // Check current voxel
     if (y >= 0 && y < CHUNK_HEIGHT) {
       const block = getBlockAtWorld(x, y, z);
+      if (includeFluids && fluidHit === null && isFluid(block)) {
+        fluidHit = { x, y, z, type: block };
+      }
       if (isSolid(block)) {
-        return {
+        const result = {
           hit: { x, y, z },
           normal: { x: normalX, y: normalY, z: normalZ },
           prev: { x: prevX, y: prevY, z: prevZ },
         };
+        if (fluidHit) result.fluidHit = fluidHit;
+        return result;
       }
     }
 
@@ -97,6 +107,17 @@ export function raycastVoxel(origin, direction) {
         normalZ = -stepZ;
       }
     }
+  }
+
+  // No solid in reach: a fluid on its own is still a valid target, so buckets
+  // can scoop an open ocean or a lava lake.
+  if (fluidHit) {
+    return {
+      hit: { x: fluidHit.x, y: fluidHit.y, z: fluidHit.z },
+      normal: { x: 0, y: 0, z: 0 },
+      prev: { x: fluidHit.x, y: fluidHit.y, z: fluidHit.z },
+      fluidHit,
+    };
   }
 
   return null;

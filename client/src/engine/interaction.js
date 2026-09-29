@@ -13,6 +13,7 @@ import {
   playFlintAndSteelSound,
   playCriticalHitSound,
   playPortalTravelSound,
+  playSplashSound,
 } from './soundFx.js';
 import { isNighttime, skipToDawn } from '../world/dayNightCycle.js';
 import {
@@ -32,9 +33,16 @@ import {
   isHoe,
   isDoor,
   isShield,
+  isFluid,
+  isBucket,
+  isFilledBucket,
+  getFluidByBucket,
+  getFluidHeight,
+  FLUID_SOURCE_LEVEL,
   getFoodNutrition,
 } from '../world/blockTypes.js';
 import { toggleLever, toggleDoor, recalculateRedstoneGrid } from './redstoneEngine.js';
+import { spawnFluidSource, spawnSplashAt } from './fluidEngine.js';
 import { spawnDrop } from '../entities/dropManager.js';
 import { openCraftingTable } from '../ui/crafting.js';
 import { openFurnace } from '../ui/furnace.js';
@@ -42,7 +50,7 @@ import { openChest, getChestItems, clearChest } from '../ui/chest.js';
 import { openEnchantingTable } from '../ui/enchantingModal.js';
 import { isAnyWindowOpen } from '../ui/uiManager.js';
 import { healPlayer, getPlayerPosition, getPlayerState } from '../entities/player.js';
-import { removeItemFromHotbar, hasItemInInventory, consumeItemFromInventory } from '../ui/inventory.js';
+import { removeItemFromHotbar, hasItemInInventory, consumeItemFromInventory, addItemToInventory } from '../ui/inventory.js';
 import { getUVsForTexture, getAtlasTexture } from '../rendering/textures/textureAtlas.js';
 
 let scene = null;
@@ -150,7 +158,9 @@ export function updateInteraction(dt = 0.016) {
   const dir = new THREE.Vector3(0, 0, -1);
   dir.applyQuaternion(cam.quaternion);
 
-  const result = raycastVoxel(cam.position, dir);
+  // Fluids are non-solid, so they are reported separately from the solid hit:
+  // the highlight and mining still use the solid block behind them.
+  const result = raycastVoxel(cam.position, dir, { includeFluids: true });
   if (result) {
     currentTarget = result;
     highlightMesh.position.set(result.hit.x + 0.5, result.hit.y + 0.5, result.hit.z + 0.5);
@@ -170,7 +180,7 @@ export function updateInteraction(dt = 0.016) {
     if (isLeftMouseDown && isBreakingBlock) {
       const blockType = getBlockAtWorld(result.hit.x, result.hit.y, result.hit.z);
 
-      if (blockType !== BlockType.AIR && blockType !== BlockType.WATER) {
+      if (blockType !== BlockType.AIR && !isFluid(blockType)) {
         const hardness = getBlockHardness(blockType);
         const speed = getMiningSpeed(blockType, selectedBlockType);
 
@@ -449,10 +459,29 @@ function onMouseDown(e) {
         }
       }
 
+      // 13. Buckets: scoop a fluid with an empty bucket
+      if (selectedBlockType === BlockType.EMPTY_BUCKET && currentTarget.fluidHit) {
+        const { x, y, z, type } = currentTarget.fluidHit;
+        setBlockAtWorld(scene, x, y, z, BlockType.AIR);
+        consumeItemFromInventory(BlockType.EMPTY_BUCKET, 1);
+        giveOrDropItem(type);
+        playSplashSound();
+        return;
+      }
+
       // 14. Place Block
       if (isPlaceableBlock(selectedBlockType)) {
         const { prev } = currentTarget;
         if (prev.y >= 0 && prev.y < 64) {
+          // Buckets pour a live source: it flows, wakes neighbours and reacts.
+          if (isFilledBucket(selectedBlockType)) {
+            if (spawnFluidSource(prev.x, prev.y, prev.z, selectedBlockType)) {
+              consumeItemFromInventory(selectedBlockType, 1);
+              spawnSplashAt(prev.x + 0.5, prev.y + getFluidHeight(FLUID_SOURCE_LEVEL), prev.z + 0.5);
+            }
+            return;
+          }
+
           const existing = getBlockAtWorld(prev.x, prev.y, prev.z);
           if (existing === BlockType.AIR) {
             playBlockPlaceSound();
@@ -484,4 +513,15 @@ export function setSelectedBlockType(type) {
 
 export function getSelectedBlockType() {
   return selectedBlockType;
+}
+
+/**
+ * Best-effort reward: put the item in the inventory, or drop it at the player's
+ * feet when every slot is taken (bucket pickups must never destroy loot).
+ */
+function giveOrDropItem(itemType, count = 1) {
+  if (addItemToInventory(itemType, count)) return;
+
+  const p = getPlayerPosition();
+  spawnDrop(p.x, p.y + 0.8, p.z, itemType);
 }

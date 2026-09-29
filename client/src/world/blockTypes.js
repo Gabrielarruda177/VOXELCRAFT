@@ -108,6 +108,8 @@ export const BlockType = {
   GOLDEN_APPLE:    144,
   BOAT:            145,
   EXPERIENCE_BOTTLE: 146,
+  // Fluid containers
+  EMPTY_BUCKET:    147,
 };
 
 export const ITEM_NAMES = {
@@ -208,6 +210,7 @@ export const ITEM_NAMES = {
   [BlockType.GOLDEN_APPLE]:    'Maçã Dourada Encantada',
   [BlockType.BOAT]:            'Barco de Carvalho',
   [BlockType.EXPERIENCE_BOTTLE]: 'Frasco de Experiência',
+  [BlockType.EMPTY_BUCKET]:   'Balde Vazio',
 };
 
 /**
@@ -267,6 +270,51 @@ export const BlockTextures = {
   [BlockType.BOOKSHELF]:          { top: 16, side: 62, bottom: 16 },
 };
 
+/**
+ * Fluid metadata model (used by fluidEngine.js and chunk.js).
+ *
+ * A fluid block stores an 8-bit `level` in the chunk's parallel fluid array:
+ *   - `0`            → dynamic SOURCE block (infinite flow, e.g. player bucket).
+ *   - `1 .. 7`       → dynamic FLOWING block, spreading one level per block.
+ *   - `FLUID_STATIC` → world-generated fluid (oceans, nether lava seas, deep
+ *                      magma lakes). It renders and interacts normally but is
+ *                      never scheduled, so it can never flood the map.
+ *                      Waking it up (digging a hole next to it) converts it
+ *                      into a real source.
+ */
+export const FLUID_SOURCE_LEVEL = 0;
+export const FLUID_MAX_FLOW_LEVEL = 7;
+export const FLUID_STATIC = 15;
+
+/** Thinnest rendered column: level 7 must stay visible, never a zero-height face. */
+const FLUID_MIN_HEIGHT = 1 / 9;
+
+/** Rendered height (in blocks) of a fluid column for a given level. */
+export function getFluidHeight(level) {
+  if (level >= FLUID_STATIC) return 1 - 1 / 8;   // Static seas behave like sources
+  if (level <= FLUID_SOURCE_LEVEL) return 1 - 1 / 8;
+  return Math.max(FLUID_MIN_HEIGHT, 1 - (level + 1) / 8);
+}
+
+/**
+ * True for the two fluid blocks of the game (Água e Lava).
+ */
+export function isFluid(type) {
+  return type === BlockType.WATER || type === BlockType.LAVA;
+}
+
+/**
+ * Blocks a fluid is allowed to replace/displace when spreading.
+ * Only air and non-solid decoration blocks (plants, torches, redstone dust,
+ * crops, doors...) can be overwritten by a flowing fluid.
+ */
+export function isFluidReplaceable(type) {
+  if (type === BlockType.AIR) return true;
+  if (isSolid(type)) return false;
+  if (isFluid(type)) return true;
+  return isTransparent(type);
+}
+
 export function isSolid(type) {
   return (
     type > BlockType.AIR &&
@@ -289,6 +337,30 @@ export function isSolid(type) {
 
 export function isPlaceableBlock(type) {
   return (type >= BlockType.GRASS && type < 100);
+}
+
+// ── Buckets ────────────────────────────────────────────────
+
+/**
+ * Water and Lava are inventory items that *are* buckets: holding them in the
+ * hotbar pours a fluid source, and `EMPTY_BUCKET` scoops one back up.
+ */
+export function isBucket(type) {
+  return (
+    type === BlockType.WATER ||
+    type === BlockType.LAVA ||
+    type === BlockType.EMPTY_BUCKET
+  );
+}
+
+/** True for the two buckets that already hold a fluid. */
+export function isFilledBucket(type) {
+  return type === BlockType.WATER || type === BlockType.LAVA;
+}
+
+/** The bucket item that stores `type`, or 0 when `type` is not a fluid. */
+export function getFluidByBucket(type) {
+  return isFilledBucket(type) ? type : 0;
 }
 
 export function isWeapon(type) {

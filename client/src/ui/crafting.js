@@ -1025,6 +1025,26 @@ export const RECIPE_CATALOG = [
       );
     },
   },
+  // ── 41. Bucket (3 Iron Ingots in a row) ──
+  {
+    id: 'bucket',
+    name: 'Balde Vazio',
+    category: 'Ferramentas',
+    result: BlockType.EMPTY_BUCKET,
+    count: 1,
+    gridSize: 3,
+    layout: [BlockType.IRON_INGOT, BlockType.IRON_INGOT, BlockType.IRON_INGOT, 0, 0, 0, 0, 0, 0],
+    desc: '3 Barras de Ferro em uma fileira. Clique com o botão direito em água ou lava para encher.',
+    check: (grid, w, h) => {
+      if (w === 2 || h === 2) return false;
+      const rows = [[0, 1, 2], [3, 4, 5], [6, 7, 8]];
+      for (const [a, b, c] of rows) {
+        if (grid[a] !== BlockType.IRON_INGOT || grid[b] !== BlockType.IRON_INGOT || grid[c] !== BlockType.IRON_INGOT) continue;
+        if (grid.every((v, i) => (i === a || i === b || i === c ? true : v === 0))) return true;
+      }
+      return false;
+    },
+  },
 ];
 
 export function evaluateCrafting(grid, width, height) {
